@@ -107,7 +107,9 @@ def _node(node, depth):
     if content is not None:
         if not isinstance(content, list) or kind in ("mention", "hardBreak"):
             _fail("Conteúdo inválido.")
-        out["content"] = [_node(c, depth + 1) for c in content]
+        # Nó de texto vazio não existe para o editor: com um deles, o documento não abriria.
+        out["content"] = [_node(c, depth + 1) for c in content
+                          if not (isinstance(c, dict) and c.get("type") == "text" and c.get("text") == "")]
     return out
 
 

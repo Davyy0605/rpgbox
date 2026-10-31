@@ -8,6 +8,7 @@ import { mentionExtension } from "./mention.js";
 import { attachToolbar } from "./toolbar.js";
 
 const editors = new Map();
+const unreadable = new WeakSet();
 
 // Mesma regra de safe_href em content/doc.py: outro endereço faria o servidor recusar o texto todo.
 function safeHref(href) {
@@ -20,11 +21,44 @@ function safeHref(href) {
   }
 }
 
-function readDoc(element) {
+function storedDoc(element) {
   const source = document.getElementById(element.dataset.doc);
-  const doc = source ? JSON.parse(source.textContent) : null;
-  // Bloco recém-criado: um documento sem nós não é válido para o editor.
+  return source ? JSON.parse(source.textContent) : null;
+}
+
+// Bloco recém-criado: um documento sem nós não é válido para o editor.
+function readDoc(element) {
+  const doc = storedDoc(element);
   return doc?.content?.length ? doc : undefined;
+}
+
+// Texto corrido de um documento, mesmo de um que o editor não abre.
+export function docText(node) {
+  if (!node || typeof node !== "object") return "";
+  if (typeof node.text === "string") return node.text;
+  if (node.type === "mention") return node.attrs?.label ?? "";
+  const parts = Array.isArray(node.content) ? node.content.map(docText) : [];
+  return parts.join(["doc", "bulletList", "orderedList"].includes(node.type) ? "\n" : "");
+}
+
+// Sem salvar nada: o conteúdo mostrado pelo editor seria só o que sobrou, e sobrescreveria o texto guardado.
+function showUnreadable(element, editor) {
+  editor.setEditable(false, false);
+  element.hidden = true;
+  const note = document.createElement("div");
+  note.className = "unreadable";
+  note.setAttribute("role", "alert");
+  const message = document.createElement("p");
+  message.textContent = "Este texto não abriu no editor. Ele segue guardado, sem nenhuma alteração.";
+  const text = document.createElement("p");
+  text.textContent = docText(storedDoc(element));
+  note.append(message, text);
+  element.after(note);
+  unreadable.add(editor);
+}
+
+export function isUnreadable(editor) {
+  return unreadable.has(editor);
 }
 
 function readMissing(element) {
@@ -40,9 +74,14 @@ function openMention(view, pos, event) {
 
 export function initEditor(element) {
   if (editors.has(element)) return editors.get(element);
+  let contentFailed = false;
   const editor = new Editor({
     element,
     content: readDoc(element),
+    enableContentCheck: true,
+    onContentError() {
+      contentFailed = true;
+    },
     extensions: [
       StarterKit.configure({
         heading: false,
@@ -75,6 +114,7 @@ export function initEditor(element) {
       element.dispatchEvent(new CustomEvent("editor:change", { bubbles: true, detail: { doc: changed.getJSON() } }));
     },
   });
+  if (contentFailed) showUnreadable(element, editor);
   attachToolbar(editor);
   editors.set(element, editor);
   return editor;

@@ -315,6 +315,83 @@ def test_empty_tab_offers_editor_without_creating_a_block(client, user, campaign
     assert not Block.objects.filter(tab=tab).exists()
 
 
+def _field(record, label):
+    return record.record_type.fielddef_set.get(label=label)
+
+
+@pytest.mark.parametrize("value", ["34", "-2", "1,5", "1.5", ""])
+def test_number_field_accepts_numbers_and_clearing(character, value):
+    assert save_field(character, _field(character, "Idade").key, value, 1).ok
+
+
+@pytest.mark.parametrize("value", ["muito", "1 2", "1,", "١٢"])
+def test_number_field_refuses_text(client, user, character, value):
+    client.force_login(user)
+    key = _field(character, "Idade").key
+    r = client.post(f"/r/{character.id}/campos/", {"key": key, "value": value, "version": 1},
+                    content_type="application/json")
+    assert r.status_code == 400 and r.json()["error"] == "Número inválido."
+    character.refresh_from_db()
+    assert key not in character.fields and key not in character.field_versions
+
+
+def test_link_field_accepts_safe_addresses_and_clearing(campaign):
+    track = make_record(campaign, "Trilhas", "Tema")
+    key = _field(track, "Link").key
+    assert save_field(track, key, "https://exemplo.com/a", 1).ok
+    assert save_field(track, key, "", 2).ok
+
+
+@pytest.mark.parametrize("value", ["javascript:alert(1)", "exemplo.com", "/relativo"])
+def test_link_field_refuses_unsafe_addresses(client, user, campaign, value):
+    client.force_login(user)
+    track = make_record(campaign, "Trilhas", "Tema")
+    r = client.post(f"/r/{track.id}/campos/", {"key": _field(track, "Link").key, "value": value, "version": 1},
+                    content_type="application/json")
+    assert r.status_code == 400 and r.json()["error"] == "Endereço inválido."
+
+
+def test_detail_has_editable_inputs_with_version_per_key(client, user, campaign):
+    client.force_login(user)
+    hero = make_record(campaign, "Personagens", "Kael")
+    job, age = _field(hero, "Ocupação"), _field(hero, "Idade")
+    hero.fields = {job.key: 'La"dino', age.key: "34"}
+    hero.field_versions = {job.key: 3}
+    hero.save()
+    html = client.get(f"/r/{hero.id}/").content.decode()
+    inputs = re.findall(r"<input[^>]*data-field[^>]*>", html)
+    assert len(inputs) == 2
+    assert f'data-key="{job.key}"' in inputs[0] and 'data-version="3"' in inputs[0]
+    assert 'value="La&quot;dino"' in inputs[0]
+    assert f'data-save-url="/r/{hero.id}/campos/"' in inputs[0]
+    assert 'inputmode="decimal"' in inputs[1] and 'data-version="1"' in inputs[1]
+
+
+def test_first_text_block_points_to_the_draft_of_its_tab(client, user, character):
+    client.force_login(user)
+    tab = tab_of(character)
+    Block.objects.create(tab=tab, kind="text", position=9, content=doc("segundo"))
+    html = client.get(f"/r/{character.id}/").content.decode()
+    mounts = re.findall(r'<div class="editor" data-editor="text".*?></div>', html, re.S)
+    assert len(mounts) == 2
+    assert f'data-orphan-url="/abas/{tab.id}/blocos/"' in mounts[0]
+    assert "data-orphan-url" not in mounts[1]
+
+
+def test_first_block_request_creates_only_when_the_tab_has_none(client, user, campaign):
+    client.force_login(user)
+    record = make_record(campaign, "Regiões", "Porto")
+    tab = tab_of(record)
+    url = f"/abas/{tab.id}/blocos/"
+    first = client.post(url, {"first": True}, content_type="application/json", headers={"Accept": "application/json"})
+    block = Block.objects.get(tab=tab)
+    assert first.json() == {"save_url": f"/blocos/{block.id}/", "version": 1}
+    assert save_block(block, doc("do pc"), 1).ok
+    again = client.post(url, {"first": True}, content_type="application/json", headers={"Accept": "application/json"})
+    assert again.json() == {"save_url": f"/blocos/{block.id}/", "version": 2, "content": doc("do pc")}
+    assert Block.objects.filter(tab=tab).count() == 1
+
+
 def test_block_add_answers_json_when_asked(client, user, character):
     client.force_login(user)
     tab = tab_of(character)

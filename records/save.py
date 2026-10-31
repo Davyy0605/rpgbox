@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
@@ -7,14 +8,15 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
-from content.doc import clean_text, valid_anchor, validate_doc
+from content.doc import clean_text, safe_href, valid_anchor, validate_doc
 from content.render import render_doc
 from indexing.services import citations, reindex_record, resolver_for
 
-from .models import Block, Record
+from .models import Block, Record, Tab
 from .sections import section
 
 MAX_VALUE = 2000
+NUMBER_RE = re.compile(r"-?[0-9]+(?:[.,][0-9]+)?")
 
 
 @dataclass
@@ -49,6 +51,13 @@ def save_block(block, content, base_version) -> SaveResult:
     return SaveResult(True, locked.version, locked.content)
 
 
+def _check_kind(kind, value):
+    if value and kind == "number" and not NUMBER_RE.fullmatch(value):
+        raise ValidationError("Número inválido.")
+    if value and kind == "link" and not safe_href(value):
+        raise ValidationError("Endereço inválido.")
+
+
 def save_field(record, key, value, base_version) -> SaveResult:
     with transaction.atomic():
         locked = Record.objects.select_for_update().select_related("record_type").get(pk=record.pk)
@@ -58,7 +67,7 @@ def save_field(record, key, value, base_version) -> SaveResult:
         if fdef.kind == "long" and isinstance(value, dict):
             value = validate_doc(value)
         elif isinstance(value, str) and len(value) <= MAX_VALUE and clean_text(value):
-            pass
+            _check_kind(fdef.kind, value)
         else:
             raise ValidationError("Valor inválido.")
         current = locked.fields.get(key, "")
@@ -77,6 +86,17 @@ def add_text_block(tab) -> Block:
     last = tab.block_set.aggregate(m=Max("position"))["m"]
     return Block.objects.create(tab=tab, kind="text", position=(last or 0) + 1,
                                 content={"type": "doc", "content": []})
+
+
+def first_text_block(tab) -> tuple[Block, bool]:
+    """O bloco que o editor de uma aba vazia preenche, e se ele nasceu agora.
+
+    O pedido é repetido quando a resposta se perde, e repetir não pode criar outro bloco.
+    """
+    with transaction.atomic():
+        Tab.objects.select_for_update().get(pk=tab.pk)
+        existing = tab.block_set.filter(kind="text").order_by("position", "id").first()
+        return (existing, False) if existing else (add_text_block(tab), True)
 
 
 def add_embed(tab, target_record, anchor) -> Block:

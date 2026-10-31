@@ -281,8 +281,8 @@ def test_record_screen_shows_basic_fields(page, live_server, logged_in, characte
     character.fields = {defs["Ocupação"].key: "Ladino", defs["Idade"].key: "34", defs["Resumo"].key: doc("meio-elfo")}
     character.save()
     page.goto(url_of(character))
-    expect(page.locator(".fields")).to_contain_text("Ladino")
-    expect(page.locator(".fields")).to_contain_text("34")
+    expect(page.get_by_label("Ocupação")).to_have_value("Ladino")
+    expect(page.get_by_label("Idade")).to_have_value("34")
     expect(page.locator(FIELD)).to_have_text("meio-elfo")
 
 

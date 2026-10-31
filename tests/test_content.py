@@ -18,6 +18,14 @@ def test_render_escapes_html():
     assert isinstance(out, SafeString)
 
 
+def test_empty_text_nodes_are_dropped_because_the_editor_refuses_them():
+    empty = {"type": "text", "text": ""}
+    d = {"type": "doc", "content": [{"type": "paragraph", "content": [empty, _text("a"), empty]},
+                                    {"type": "paragraph", "content": [empty]}]}
+    assert validate_doc(d) == {"type": "doc", "content": [{"type": "paragraph", "content": [_text("a")]},
+                                                          {"type": "paragraph", "content": []}]}
+
+
 def test_rejects_unknown_node_and_javascript_url():
     with pytest.raises(ValidationError):
         validate_doc({"type": "doc", "content": [{"type": "iframe"}]})

@@ -16,8 +16,8 @@ from indexing.services import citations, resolver_for
 
 from .forms import GroupChoiceForm, RecordForm, RenameForm, TitleForm
 from .models import Record
-from .save import (add_embed, add_text_block, delete_block, delete_preview, rename_record, resolve_embed,
-                   save_block, save_field)
+from .save import (add_embed, add_text_block, delete_block, delete_preview, first_text_block, rename_record,
+                   resolve_embed, save_block, save_field)
 from .services import add_record_tab, add_subtab, create_record, visible_fields, visible_tabs
 
 
@@ -152,12 +152,14 @@ def _editor(kind, doc, resolver, doc_id, label, **attrs):
 def _detail_fields(record):
     resolver = resolver_for(record.campaign)
     out = []
+    save_url = reverse("field-save", args=[record.id])
     for f, value in visible_fields(record):
-        item = {"label": f.label, "value": value}
+        version = record.field_versions.get(f.key, 1)
+        item = {"id": f.id, "label": f.label, "kind": f.kind, "key": f.key, "value": value,
+                "save_url": save_url, "version": version}
         if f.kind == "long":
             item["editor"] = _editor("field", value, resolver, f"campo-{f.id}", f.label, key=f.key,
-                                     save_url=reverse("field-save", args=[record.id]),
-                                     version=record.field_versions.get(f.key, 1))
+                                     save_url=save_url, version=version)
         elif f.kind == "link" and safe_href(value):
             item["href"] = value
         out.append(item)
@@ -171,13 +173,16 @@ def _new_block_editor(tab):
 def _block_views(tab, record):
     resolver = resolver_for(record.campaign)
     out = []
+    # Rascunho escrito com a aba vazia: se o bloco nasceu e a resposta se perdeu, é o primeiro que o recolhe.
+    orphan_url = reverse("block-add", args=[tab.id])
     for b in tab.block_set.order_by("position", "id"):
         if b.kind == "embed":
             out.append({"block": b, "embed": resolve_embed(b)})
         else:
             out.append({"block": b, "editor": _editor("text", b.content, resolver, f"bloco-{b.id}", "Texto",
                                                       save_url=reverse("block-save", args=[b.id]),
-                                                      version=b.version)})
+                                                      version=b.version, orphan_url=orphan_url)})
+            orphan_url = None
     return out
 
 
@@ -198,9 +203,13 @@ def _version(data):
 @require_POST
 def block_add(request, tab_id):
     tab = get_tab(request.user, tab_id)
-    block = add_text_block(tab)
+    if request.content_type == "application/json" and (_json_body(request) or {}).get("first"):
+        block, created = first_text_block(tab)
+    else:
+        block, created = add_text_block(tab), True
     if request.headers.get("Accept") == "application/json":
-        return JsonResponse({"save_url": reverse("block-save", args=[block.id]), "version": block.version})
+        answer = {"save_url": reverse("block-save", args=[block.id]), "version": block.version}
+        return JsonResponse(answer if created else {**answer, "content": block.content})
     return redirect(f"/r/{tab.record_id}/?aba={tab.id}")
 
 
@@ -256,8 +265,8 @@ def field_save(request, record_id):
         return JsonResponse({"error": "Requisição inválida."}, status=400)
     try:
         result = save_field(record, data["key"], data.get("value"), version)
-    except ValidationError:
-        return JsonResponse({"error": "Valor inválido."}, status=400)
+    except ValidationError as error:
+        return JsonResponse({"error": error.message}, status=400)
     if not result.ok:
         return JsonResponse({"version": result.version, "value": result.current_content}, status=409)
     return JsonResponse({"version": result.version})

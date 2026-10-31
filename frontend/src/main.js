@@ -1,5 +1,5 @@
-import { attachDirectSave } from "./directsave.js";
-import { destroyDetachedEditors, initEditor } from "./editor.js";
+import { attachAutosave, attachFieldAutosave, draftKey } from "./autosave.js";
+import { destroyDetachedEditors, initEditor, isUnreadable } from "./editor.js";
 import { initPicker } from "./picker.js";
 
 const started = new WeakSet();
@@ -9,12 +9,31 @@ function within(root, selector) {
   return root.matches(selector) ? [root, ...found] : found;
 }
 
+function startEditor(element) {
+  const editor = initEditor(element);
+  if (isUnreadable(editor)) return;
+  const { saveUrl, createUrl, key: fieldKey, version, orphanUrl } = element.dataset;
+  attachAutosave(editor, {
+    element,
+    saveUrl,
+    createUrl,
+    fieldKey,
+    version: version === undefined ? null : Number(version),
+    draftKey: draftKey(saveUrl ?? createUrl, fieldKey),
+    orphanKey: orphanUrl && draftKey(orphanUrl),
+  });
+}
+
 function activate(root) {
   for (const element of within(root, "[data-editor]")) {
     if (started.has(element)) continue;
     started.add(element);
-    initEditor(element);
-    attachDirectSave(element);
+    startEditor(element);
+  }
+  for (const input of within(root, "[data-field]")) {
+    if (started.has(input)) continue;
+    started.add(input);
+    attachFieldAutosave(input);
   }
   within(root, "[data-embed-picker]").forEach(initPicker);
 }

@@ -5,8 +5,11 @@
 <h1>{{ record.name }}</h1>
 {% if fields %}
 <section class="fields" aria-label="Campos">
-  {% for f in fields %}<div class="field"><span class="muted">{{ f.label }}</span>
-    {% if f.editor %}{% include "records/_editor.html" with e=f.editor %}{% elif f.href %}<a href="{{ f.href }}" target="_blank" rel="noopener noreferrer nofollow">{{ f.value }}</a>{% elif f.value != "" and f.value != None %}<span>{{ f.value }}</span>{% else %}<span class="muted">—</span>{% endif %}
+  {% for f in fields %}<div class="field">
+    {% if f.editor %}<span class="muted">{{ f.label }}</span>{% include "records/_editor.html" with e=f.editor %}
+    {% else %}<label class="muted" for="valor-{{ f.id }}">{{ f.label }}</label>
+    <input id="valor-{{ f.id }}" data-field="{{ f.kind }}" data-key="{{ f.key }}" data-save-url="{{ f.save_url }}" data-version="{{ f.version }}" value="{{ f.value|default_if_none:'' }}" maxlength="2000" autocomplete="off"{% if f.kind == "number" %} inputmode="decimal"{% elif f.kind == "link" %} type="url" inputmode="url"{% endif %}>
+    {% if f.href %}<a class="field-open" href="{{ f.href }}" target="_blank" rel="noopener noreferrer nofollow">Abrir</a>{% endif %}{% endif %}
   </div>{% endfor %}
 </section>
 {% endif %}
