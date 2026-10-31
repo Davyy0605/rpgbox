@@ -179,7 +179,8 @@ def _requested_panel(request, campaign):
 
 def _display_fields(record):
     resolver = resolver_for(record.campaign)
-    return [(f, render_doc(v, resolver) if f.kind == "long" and isinstance(v, dict) else v)
+    return [(f, render_doc(v, resolver) if f.kind == "long" and isinstance(v, dict) else v,
+             v if f.kind == "link" and safe_href(v) else None)
             for f, v in visible_fields(record)]
 
 

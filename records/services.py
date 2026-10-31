@@ -33,6 +33,7 @@ def visible_tabs(record):
     """Sincroniza as abas do registro com o modelo e devolve as de topo, com .children."""
     tabs = _sync_tabs(record)
     with_blocks = set(Block.objects.filter(tab__record=record).values_list("tab_id", flat=True))
+    with_blocks |= set(record.asset_set.exclude(tab=None).values_list("tab_id", flat=True))  # arquivos também são conteúdo
     by_id = {t.id: t for t in tabs}
 
     def has_content(tab):

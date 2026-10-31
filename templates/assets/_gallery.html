@@ -5,7 +5,7 @@
     <div class="gal-actions">
       {% if record.main_image_id == a.id %}<span class="muted">Principal</span>{% else %}
       <form method="post" action="{% url 'asset-main' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Tornar principal</button></form>{% endif %}
-      <form method="post" action="{% url 'asset-delete' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Excluir</button></form>
+      <details class="confirm"><summary class="btn-link">Excluir</summary><form method="post" action="{% url 'asset-delete' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Confirmar exclusão</button></form></details>
     </div>
   </li>
   {% empty %}{% if not files %}<li class="muted">Sem arquivos.</li>{% endif %}{% endfor %}

@@ -42,6 +42,8 @@ def _mention(node, names):
     href = reverse("record-detail", args=[record])
     panel = reverse("record-panel", args=[record])
     if valid_anchor(anchor):
+        _, sep, heading = attrs.get("label", "").rpartition(SEP)
+        name = f"{name}{sep}{heading}"
         return format_html('<a class="mention" href="{}?trecho={}#{}" data-panel-url="{}?ancora={}" '
                            'data-record="{}" data-anchor="{}">{}</a>',
                            href, anchor, anchor, panel, anchor, record, anchor, name)
