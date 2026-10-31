@@ -81,4 +81,7 @@ def add_record_tab(record, title):
 def create_record(record_type, name, group=None):
     record = Record.objects.create(campaign=record_type.campaign, record_type=record_type, name=name, group=group)
     _sync_tabs(record)
+    from indexing.services import reindex_record
+
+    reindex_record(record)
     return record

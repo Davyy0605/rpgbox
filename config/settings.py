@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "accounts",
     "campaigns",
     "records",
+    "indexing",
 ]
 
 MIDDLEWARE = [

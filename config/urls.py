@@ -13,4 +13,5 @@ urlpatterns = [
     path("", include("accounts.urls")),
     path("", include("campaigns.urls")),
     path("", include("records.urls")),
+    path("", include("indexing.urls")),
 ]

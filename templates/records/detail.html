@@ -12,6 +12,11 @@
 {% else %}
 <p class="muted">Este registro não tem abas. Use + para criar uma.</p>
 {% endif %}
+{% if citations %}
+<section class="cited"><h2>Citado em</h2>
+  <ul class="list">{% for c in citations %}<li><a href="{% url 'record-detail' c.id %}">{{ c.name }} <span class="muted">{{ c.record_type.name }}</span></a></li>{% endfor %}</ul>
+</section>
+{% endif %}
 {% if record.record_type.listgroup_set.exists %}
 <form method="post" action="{% url 'record-group' record.id %}" class="form group-pick">
   {% csrf_token %}

@@ -6,6 +6,8 @@ from django.views.decorators.http import require_POST
 from campaigns.access import get_campaign, get_record
 from campaigns.models import ListGroup
 
+from indexing.services import citations
+
 from .forms import GroupChoiceForm, RecordForm, TitleForm
 from .services import add_record_tab, add_subtab, create_record, visible_fields, visible_tabs
 
@@ -72,7 +74,7 @@ def record_detail(request, record_id):
             selected = parent = tabs[0]
     return render(request, "records/detail.html", {
         "record": record, "campaign": record.campaign, "tabs": tabs, "selected": selected,
-        "parent": parent, "gallery": gallery, "fields": visible_fields(record),
+        "parent": parent, "gallery": gallery, "citations": citations(record), "fields": visible_fields(record),
         "group_form": GroupChoiceForm(record.record_type, initial={"group": record.group_id}),
     })
 
