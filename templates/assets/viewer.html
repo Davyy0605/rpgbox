@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
 {% block title %}{{ asset.filename }}{% endblock %}
 {% block crumbs %}<a href="{% url 'record-detail' record.id %}">{{ record.name }}</a>{% endblock %}
 {% block content %}
@@ -6,7 +6,8 @@
 {% if asset.kind == "image" %}
 <img class="viewer-img" src="{{ file_url }}" alt="{{ asset.filename }}" width="{{ asset.width }}" height="{{ asset.height }}">
 {% else %}
-<div class="pdf-viewer" data-pdf-url="{{ file_url }}"><a class="btn-link" href="{{ file_url }}">Abrir PDF</a></div>
+<div class="pdf-viewer" data-pdf-url="{{ file_url }}" data-worker-url="{% static 'js/pdf.worker.js' %}"><a class="btn-link" href="{{ file_url }}">Abrir PDF</a></div>
+<script src="{% static 'js/pdf.js' %}" defer></script>
 {% endif %}
 <p><a class="btn-link" href="{% url 'asset-file' asset.id %}">Baixar</a></p>
 {% endblock %}

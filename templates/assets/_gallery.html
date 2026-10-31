@@ -1,4 +1,4 @@
-<ul class="grid">
+<ul class="grid" data-gallery>
   {% for a in images %}
   <li class="gal-item">
     <a href="{% url 'asset-open' a.id %}"><img src="{% url 'asset-file' a.id %}?v=thumb&amp;inline=1" alt="{{ a.filename }}" loading="lazy" class="gal-img"></a>
@@ -11,9 +11,9 @@
   {% empty %}{% if not files %}<li class="muted">Sem arquivos.</li>{% endif %}{% endfor %}
 </ul>
 {% include "assets/_files.html" %}
-<form method="post" action="{% url 'asset-upload' record.id %}" enctype="multipart/form-data" class="form">
+<form method="post" action="{% url 'asset-upload' record.id %}" enctype="multipart/form-data" class="form dropzone">
   {% csrf_token %}
   {% if upload_tab %}<input type="hidden" name="tab" value="{{ upload_tab }}">{% endif %}
-  <input type="file" name="file" aria-label="Adicionar arquivo" required>
+  <div data-dropzone><input type="file" name="file" aria-label="Adicionar arquivo, ou arraste e cole aqui" required></div>
   <button class="btn" type="submit">Enviar</button>
 </form>

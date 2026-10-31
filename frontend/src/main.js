@@ -1,6 +1,7 @@
 import { attachDirectSave } from "./directsave.js";
 import { destroyDetachedEditors, initEditor } from "./editor.js";
 import { initPicker } from "./picker.js";
+import { initUpload } from "./upload.js";
 
 const started = new WeakSet();
 
@@ -17,6 +18,7 @@ function activate(root) {
     attachDirectSave(element);
   }
   within(root, "[data-embed-picker]").forEach(initPicker);
+  within(root, "[data-dropzone]").forEach(initUpload);
 }
 
 function scrollToAnchor() {

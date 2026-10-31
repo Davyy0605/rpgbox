@@ -75,6 +75,10 @@ h1 { font-size: 1.4rem; margin: 8px 0 16px; }
 .gal-actions, .file-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
 .viewer-img { max-width: 100%; height: auto; display: block; }
 .pdf-viewer { min-height: 200px; }
+.pdf-canvas { display: block; max-width: 100%; height: auto; background: #fff; }
+.pdf-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.dropzone { border: 1px dashed transparent; border-radius: 6px; padding: 8px 0; }
+.dropzone.over { border-color: currentColor; }
 
 /* Registro: campos e editor */
 .fields { margin-bottom: 16px; }
