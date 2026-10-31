@@ -91,10 +91,20 @@ def test_list_all_and_gallery_view(client, user, tracks):
     assert r.status_code == 200 and b"Duelo" in r.content
 
 
-def test_list_foreign_group_is_404(client, user, tracks, campaign):
-    other = campaign.recordtype_set.get(name="Itens")
-    g = ListGroup.objects.create(record_type=other, name="X")
+def test_list_foreign_group_shows_all_without_leaking(client, user, other_user, make_campaign, tracks, campaign):
+    other_type = ListGroup.objects.create(record_type=campaign.recordtype_set.get(name="Itens"), name="Alheia")
+    theirs = make_campaign(other_user, "Outra").recordtype_set.get(name="Trilhas")
+    other_master = ListGroup.objects.create(record_type=theirs, name="Secreta")
     client.force_login(user)
+    for g in (other_type, other_master):
+        r = client.get(f"/c/{tracks.campaign_id}/t/{tracks.id}/?g={g.id}")
+        assert r.status_code == 200 and r.context["current_group"] is None
+        assert b"Taberna" in r.content and b"Duelo" in r.content and g.name.encode() not in r.content
+
+
+def test_list_of_another_master_is_still_404(client, other_user, tracks):
+    client.force_login(other_user)
+    g = tracks.listgroup_set.first()
     assert client.get(f"/c/{tracks.campaign_id}/t/{tracks.id}/?g={g.id}").status_code == 404
 
 
