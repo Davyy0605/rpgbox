@@ -1,5 +1,7 @@
 // Lista de sugestões usada pelo `@` e pela escolha de origem do bloco incorporado.
 
+export const SEARCH_DELAY = 200;
+
 export function suggestionFetcher(url) {
   let controller = null;
   return async (query) => {
@@ -27,6 +29,7 @@ export class SuggestList {
     this.onPick = onPick;
     this.items = [];
     this.active = 0;
+    this.loading = false;
     this.el = document.createElement("ul");
     this.el.className = "suggest";
     this.el.setAttribute("role", "listbox");
@@ -42,9 +45,18 @@ export class SuggestList {
   }
 
   show(items, query, rect) {
+    this.loading = false;
     this.items = items;
     this.active = 0;
     this.render(query);
+    this.el.hidden = false;
+    this.place(rect);
+  }
+
+  // Sem resposta ainda: mantém o que está na tela, para a lista não piscar a cada tecla.
+  showLoading(query, rect) {
+    this.loading = true;
+    if (!this.items.length) this.render(query);
     this.el.hidden = false;
     this.place(rect);
   }
@@ -62,7 +74,7 @@ export class SuggestList {
       const hint = document.createElement("li");
       hint.setAttribute("role", "presentation");
       hint.className = "muted";
-      hint.textContent = query.trim() ? "Nada encontrado." : "Digite para buscar.";
+      hint.textContent = !query.trim() ? "Digite para buscar." : this.loading ? "Buscando…" : "Nada encontrado.";
       rows.push(hint);
     }
     this.el.replaceChildren(...rows);
@@ -95,7 +107,10 @@ export class SuggestList {
     });
   }
 
+  // Devolve true quando o Enter fica com a lista. Durante a busca ele é só ignorado:
+  // a opção na tela pode ser antiga, e soltá-lo para o editor quebraria o parágrafo.
   pickActive() {
+    if (this.loading) return true;
     const item = this.items[this.active];
     if (!item) return false;
     this.onPick(item);

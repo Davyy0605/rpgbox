@@ -1,7 +1,7 @@
 import Mention from "@tiptap/extension-mention";
 
 import { ANCHOR } from "./heading.js";
-import { SuggestList, suggestionFetcher } from "./suggest.js";
+import { SEARCH_DELAY, SuggestList, suggestionFetcher } from "./suggest.js";
 
 function suggestionRender() {
   return () => {
@@ -11,11 +11,15 @@ function suggestionRender() {
     const hide = () => list?.hide();
     const update = (props) => {
       command = props.command;
+      const { query, items, clientRect } = props;
       // Com espaços na busca, sem resultados é só texto comum: não atrapalha a escrita.
-      if (!props.items.length && props.query.includes(" ")) {
+      const plainText = query.includes(" ") && !list.visible;
+      if (props.loading && query.trim()) {
+        if (!plainText) list.showLoading(query, clientRect());
+      } else if (!items.length && query.includes(" ")) {
         hide();
       } else {
-        list.show(props.items, props.query, props.clientRect());
+        list.show(items, query, clientRect());
       }
     };
     return {
@@ -85,6 +89,7 @@ export function mentionExtension({ suggestUrl, missing }) {
     suggestion: {
       char: "@",
       allowSpaces: true,
+      debounce: SEARCH_DELAY,
       items: ({ query }) => fetchItems(query),
       render: suggestionRender(),
       command: ({ editor, range, props }) => {

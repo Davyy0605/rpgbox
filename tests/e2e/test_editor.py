@@ -353,6 +353,108 @@ def test_embed_picker_does_not_offer_the_record_itself(page, live_server, logged
     expect(page.get_by_role("option")).to_have_count(0)
 
 
+SUGGEST = re.compile(r"/sugestoes/\?q=")
+BURST = "elfos negros antigos"
+
+
+def suggest_queries(page):
+    """Lista viva dos pedidos de sugestão feitos pela página."""
+    urls = []
+    page.on("request", lambda r: urls.append(r.url) if SUGGEST.search(r.url) else None)
+    return urls
+
+
+def watch_no_results(page):
+    page.evaluate("""() => {
+        window.sawNoResults = false;
+        new MutationObserver(() => {
+            const list = document.querySelector("[role=listbox]");
+            if (list && !list.hidden && list.textContent.includes("Nada encontrado")) window.sawNoResults = true;
+        }).observe(document.body, {childList: true, subtree: true, characterData: true, attributes: true});
+    }""")
+
+
+def test_typing_a_burst_sends_one_suggest_request(page, live_server, logged_in, character, campaign):
+    make_record(campaign, "Raças", "Elfos Negros Antigos")
+    urls = suggest_queries(page)
+    page.goto(url_of(character)); page.locator(TEXT).click()
+    page.keyboard.press("Control+End"); page.keyboard.type(f" @{BURST}", delay=15)
+    expect(page.get_by_role("option", name="Elfos Negros Antigos")).to_be_visible()
+    assert 1 <= len(urls) <= 2, urls
+    assert urls[-1].endswith("q=elfos%20negros%20antigos")
+
+
+def test_picker_burst_sends_one_suggest_request(page, live_server, logged_in, character, campaign):
+    make_record(campaign, "Raças", "Elfos Negros Antigos")
+    urls = suggest_queries(page)
+    page.goto(url_of(character))
+    page.get_by_text("Incorporar").click()
+    page.get_by_role("combobox", name="Origem").press_sequentially(BURST, delay=15)
+    expect(page.get_by_role("option", name="Elfos Negros Antigos")).to_be_visible()
+    assert 1 <= len(urls) <= 2, urls
+
+
+def test_slow_suggest_shows_searching_and_enter_waits(page, live_server, logged_in, character, elf):
+    held = []
+    page.route(SUGGEST, lambda route: held.append(route))
+    page.goto(url_of(character)); page.locator(TEXT).click()
+    watch_no_results(page)
+    page.keyboard.press("Control+End"); page.keyboard.type(" @elf")
+    listbox = page.get_by_role("listbox")
+    expect(listbox).to_contain_text("Buscando")
+    page.wait_for_timeout(400)
+    assert held, "o pedido deveria estar segurado"
+
+    page.keyboard.press("Enter")
+    expect(page.locator(TEXT).locator("p")).to_have_count(1)
+    assert page.evaluate("window.sawNoResults") is False
+
+    held[-1].continue_()
+    expect(page.get_by_role("option", name="Elfos")).to_be_visible()
+    assert page.evaluate("window.sawNoResults") is False
+
+
+def test_slow_suggest_keeps_the_list_and_enter_picks_only_after_the_answer(page, live_server, logged_in, character, elf):
+    held = []
+    page.route(SUGGEST, lambda route: held.append(route))
+    page.goto(url_of(character)); page.locator(TEXT).click()
+    watch_no_results(page)
+    page.keyboard.press("Control+End"); page.keyboard.type(" @elf")
+    page.wait_for_timeout(400)
+    held[-1].continue_()
+    option = page.get_by_role("option", name="Elfos")
+    expect(option).to_be_visible()
+
+    answered = len(held)
+    page.keyboard.type("o")
+    expect(option).to_be_visible()
+    page.keyboard.press("Enter")
+    expect(page.locator(TEXT).locator("p")).to_have_count(1)
+    expect(page.locator(TEXT).locator(".mention")).to_have_count(0)
+    page.wait_for_timeout(400)
+    assert len(held) > answered and page.evaluate("window.sawNoResults") is False
+
+    held[-1].continue_()
+    expect(option).to_be_visible()
+    page.keyboard.press("Enter")
+    expect(page.locator(TEXT).locator(".mention")).to_have_text("Elfos")
+
+
+def test_picker_enter_waits_for_the_answer(page, live_server, logged_in, character, elf):
+    held = []
+    page.route(SUGGEST, lambda route: held.append(route))
+    page.goto(url_of(character))
+    page.get_by_text("Incorporar").click()
+    box = page.get_by_role("combobox", name="Origem")
+    box.press_sequentially("elf")
+    expect(page.get_by_role("listbox")).to_contain_text("Buscando")
+    box.press("Enter")
+    assert not Block.objects.filter(kind="embed").exists()
+    page.wait_for_timeout(400)
+    held[-1].continue_()
+    expect(page.get_by_role("option", name="Elfos")).to_be_visible()
+
+
 def test_no_horizontal_scroll_with_editor(page, live_server, logged_in, character):
     page.goto(url_of(character)); page.locator(TEXT).click()
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
