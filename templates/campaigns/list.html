@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Campanhas · RPGBox{% endblock %}
+{% block content %}
+<h1>Campanhas</h1>
+<ul class="list">
+  {% for c in campaigns %}<li><a href="{% url 'campaign-home' c.id %}">{{ c.name }}</a></li>{% empty %}<li class="muted">Nenhuma campanha ainda.</li>{% endfor %}
+</ul>
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ form.as_div }}
+  <button class="btn" type="submit">Criar campanha</button>
+</form>
+{% endblock %}

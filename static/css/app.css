@@ -29,3 +29,9 @@ h1 { font-size: 1.4rem; margin: 8px 0 16px; }
 .form .errorlist { color: var(--danger); list-style: none; padding: 0; margin: 0 0 4px; }
 .btn { min-height: 44px; padding: 0 20px; font-size: 16px; color: #14110f; background: var(--accent); border: 0; border-radius: 6px; cursor: pointer; }
 @media (min-width: 768px) { .page { padding: 32px 16px; } }
+.list { list-style: none; padding: 0; margin: 0 0 16px; }
+.list li { border-bottom: 1px solid var(--border); }
+.list li > a { display: flex; align-items: center; min-height: 44px; }
+.muted { color: var(--muted); }
+.type-row { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.plus { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; font-size: 1.4rem; text-decoration: none; }

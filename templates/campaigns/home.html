@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ campaign.name }} · RPGBox{% endblock %}
+{% block crumbs %}<a href="{% url 'campaign-list' %}">Campanhas</a>{% endblock %}
+{% block content %}
+<h1>{{ campaign.name }}</h1>
+<form class="form" role="search"><input type="search" name="q" placeholder="Buscar" aria-label="Buscar"></form>
+<ul class="list">
+  {% for t in types %}
+  <li class="type-row"><span>{{ t.name }} <span class="muted">{{ t.total|default:0 }}</span></span><a class="plus" href="#" aria-label="Novo em {{ t.name }}">+</a></li>
+  {% endfor %}
+</ul>
+{% endblock %}
