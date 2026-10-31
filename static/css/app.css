@@ -170,3 +170,14 @@ body.editing .page { padding-bottom: 88px; }
   .sheet-grip { display: none; }
   .sheet.rising { animation: none; }
 }
+
+/* Menu Deletar e avisos */
+.delete-menu { position: fixed; z-index: 40; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.delete-menu button { display: block; min-width: 120px; min-height: 44px; padding: 0 14px; font-size: 16px; text-align: left; color: var(--danger); background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
+.delete-menu button:hover, .delete-menu button:focus-visible { background: var(--bg); }
+.notice { position: fixed; top: 64px; left: 16px; right: 16px; z-index: 40; max-width: 448px; margin: 0 auto; padding: 10px 12px; color: var(--danger); background: var(--surface); border: 1px solid var(--danger); border-radius: 6px; }
+[data-delete-url][aria-busy=true] { opacity: .5; }
+/* O htmx põe o trecho novo antes de tirar o velho: com a ancoragem, o navegador rolaria a tela nesse instante */
+#modelo, #grupos, #abas, #arquivos { overflow-anchor: none; }
+/* No toque, segurar o dedo é o menu do site, não a seleção de texto nem o menu do link no iOS */
+@media (pointer: coarse) { [data-delete-url] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }

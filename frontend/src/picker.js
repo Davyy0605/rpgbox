@@ -13,7 +13,7 @@ export function initPicker(form) {
   const list = new SuggestList((item) => {
     form.elements.record.value = item.record;
     form.elements.anchor.value = item.anchor;
-    form.submit();
+    form.requestSubmit();
   });
 
   let timer = null;
@@ -53,6 +53,11 @@ export function initPicker(form) {
     }
   });
   input.addEventListener("blur", () => setOpen(false));
+  form.addEventListener("htmx:afterRequest", (event) => {
+    if (!event.detail.successful) return;
+    input.value = "";
+    if (details) details.open = false;
+  });
   details?.addEventListener("toggle", () => {
     if (details.open) input.focus();
   });

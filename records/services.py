@@ -40,7 +40,7 @@ def visible_tabs(record):
         return tab.id in with_blocks or any(has_content(c) for c in tabs if c.parent_id == tab.id)
 
     def shown(tab):
-        return tab.tab_def is None or not tab.tab_def.removed or has_content(tab)
+        return not tab.hidden and (tab.tab_def is None or not tab.tab_def.removed or has_content(tab))
 
     for t in tabs:
         t.children = []
@@ -76,6 +76,20 @@ def add_subtab(tab, title):
 
 def add_record_tab(record, title):
     return Tab.objects.create(record=record, title=title, position=_next_position(record))
+
+
+@transaction.atomic
+def delete_tab(tab):
+    """Apaga a aba, as sub-abas e o que há nelas. A que veio do modelo fica oculta, ou a sincronização a recriaria."""
+    from assets.models import Asset
+    from indexing.services import reindex_record
+
+    tabs = [tab, *tab.subtabs.all()]
+    Asset.objects.filter(tab__in=tabs).delete()  # Asset.tab é SET_NULL: sem isto o arquivo ficaria órfão
+    Block.objects.filter(tab__in=tabs).delete()
+    Tab.objects.filter(pk__in=[t.pk for t in tabs], tab_def__isnull=False).update(hidden=True)
+    Tab.objects.filter(pk__in=[t.pk for t in tabs], tab_def__isnull=True).delete()
+    reindex_record(tab.record)
 
 
 @transaction.atomic

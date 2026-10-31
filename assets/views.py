@@ -4,7 +4,7 @@ from django.http import FileResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from campaigns.access import get_record
+from campaigns.access import deleted, get_record
 
 from .images import InvalidFile
 from .models import Asset
@@ -22,7 +22,7 @@ def asset_upload(request, record_id):
     record = get_record(request.user, record_id)
     tab = None
     if request.POST.get("tab"):
-        tab = get_object_or_404(record.tab_set, pk=request.POST["tab"])
+        tab = get_object_or_404(record.tab_set.filter(hidden=False), pk=request.POST["tab"])
     file = request.FILES.get("file")
     try:
         if file is None:
@@ -59,8 +59,13 @@ def _serve(asset, inline, variant):
     return resp
 
 
-def _back(asset):
-    return f"/r/{asset.record_id}/?aba={asset.tab_id or 'galeria'}"
+def _back(request, record, tab_id):
+    if "HX-Request" not in request.headers:
+        return redirect(f"/r/{record.id}/?aba={tab_id or 'galeria'}")
+    assets = record.asset_set.filter(tab_id=tab_id)
+    return render(request, "assets/_items.html", {
+        "record": record, "images": [a for a in assets if a.kind == "image"],
+        "files": [a for a in assets if a.kind != "image"]})
 
 
 @login_required
@@ -70,13 +75,14 @@ def asset_main(request, asset_id):
     if asset.kind == "image":
         asset.record.main_image = asset
         asset.record.save(update_fields=["main_image"])
-    return redirect(_back(asset))
+    return _back(request, asset.record, asset.tab_id)
 
 
 @login_required
 @require_POST
 def asset_delete(request, asset_id):
     asset = get_asset(request.user, asset_id)
-    back = _back(asset)
+    record, tab_id = asset.record, asset.tab_id
     asset.delete()
-    return redirect(back)
+    record.refresh_from_db(fields=["main_image"])
+    return deleted(request, _back(request, record, tab_id))

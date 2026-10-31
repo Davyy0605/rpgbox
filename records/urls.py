@@ -11,6 +11,7 @@ urlpatterns = [
     path("r/<int:record_id>/grupo/", views.record_group, name="record-group"),
     path("r/<int:record_id>/abas/nova/", views.tab_add, name="tab-add"),
     path("r/<int:record_id>/abas/<int:tab_id>/sub/", views.subtab_add, name="subtab-add"),
+    path("abas/<int:tab_id>/apagar/", views.tab_delete, name="tab-delete"),
     path("abas/<int:tab_id>/blocos/", views.block_add, name="block-add"),
     path("abas/<int:tab_id>/incorporar/", views.embed_add, name="embed-add"),
     path("blocos/<int:block_id>/", views.block_save, name="block-save"),

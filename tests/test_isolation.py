@@ -81,4 +81,5 @@ def test_owner_does_not_get_404(client, user, world, method, name, params):
 
 def test_every_parameterized_route_is_listed():
     assert all_parameterized_route_names() <= {n for _, n, _ in owner_scoped_routes()}
-    assert {"asset-file", "asset-main", "asset-delete", "asset-open"} <= all_parameterized_route_names()
+    assert {"asset-file", "asset-main", "asset-delete", "asset-open", "tab-delete", "type-delete",
+            "campaign-delete"} <= all_parameterized_route_names()

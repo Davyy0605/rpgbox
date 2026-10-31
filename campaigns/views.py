@@ -1,11 +1,13 @@
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 
 from assets.storage import storage_used
 
-from .access import get_campaign
+from .access import deleted, get_campaign
 from .defaults import seed_campaign
 from .forms import CampaignForm, RecordTypeForm
 from .models import Campaign
@@ -34,12 +36,20 @@ def campaign_list(request):
 
 
 @login_required
+@ensure_csrf_cookie  # esta tela não tem formulário, e o menu Deletar precisa do cookie
 def campaign_home(request, campaign_id):
     campaign = get_campaign(request.user, campaign_id)
     campaign.last_opened_at = timezone.now()
     campaign.save(update_fields=["last_opened_at"])
     types = campaign.recordtype_set.order_by("position").annotate(total=Count("record"))
     return render(request, "campaigns/home.html", {"campaign": campaign, "types": types})
+
+
+@login_required
+@require_POST
+def campaign_delete(request, campaign_id):
+    get_campaign(request.user, campaign_id).delete()
+    return deleted(request, redirect("campaign-list"))
 
 
 @login_required
@@ -50,3 +60,11 @@ def type_new(request, campaign_id):
         rtype = create_type(campaign, form.cleaned_data["name"])
         return redirect("record-list", campaign_id=campaign.id, type_id=rtype.id)
     return render(request, "campaigns/type_new.html", {"campaign": campaign, "form": form})
+
+
+@login_required
+@require_POST
+def type_delete(request, campaign_id, type_id):
+    campaign = get_campaign(request.user, campaign_id)
+    get_object_or_404(campaign.recordtype_set, pk=type_id).delete()
+    return deleted(request, redirect("campaign-home", campaign_id=campaign.id))
