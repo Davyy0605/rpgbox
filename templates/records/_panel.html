@@ -1,0 +1,11 @@
+<section class="sheet" aria-label="{{ record.name }}">
+  <div class="sheet-head">
+    <h2>{{ record.name }}</h2>
+    <a class="plus" href="{% url 'record-list' record.campaign_id record.record_type_id %}" aria-label="Fechar">×</a>
+  </div>
+  <div class="thumb" aria-hidden="true">{{ record.name }}</div>
+  <dl>
+    {% for f, value in fields %}{% if value != "" and value != None %}<dt class="muted">{{ f.label }}</dt><dd>{{ value }}</dd>{% endif %}{% endfor %}
+  </dl>
+  <a class="btn-link" href="{% url 'record-detail' record.id %}">Expandir</a>
+</section>

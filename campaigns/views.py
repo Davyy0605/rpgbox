@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from .access import get_campaign
 from .defaults import seed_campaign
-from .forms import CampaignForm
+from .forms import CampaignForm, RecordTypeForm
 from .models import Campaign, RecordType
 
 
@@ -34,7 +34,17 @@ def campaign_home(request, campaign_id):
     campaign = get_campaign(request.user, campaign_id)
     campaign.last_opened_at = timezone.now()
     campaign.save(update_fields=["last_opened_at"])
-    types = campaign.recordtype_set.order_by("position")
-    if hasattr(RecordType, "record_set"):  # relação criada na Tarefa 3
-        types = types.annotate(total=Count("record"))
+    types = campaign.recordtype_set.order_by("position").annotate(total=Count("record"))
     return render(request, "campaigns/home.html", {"campaign": campaign, "types": types})
+
+
+@login_required
+def type_new(request, campaign_id):
+    campaign = get_campaign(request.user, campaign_id)
+    form = RecordTypeForm(campaign, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        last = campaign.recordtype_set.order_by("-position").first()
+        rtype = RecordType.objects.create(campaign=campaign, name=form.cleaned_data["name"],
+                                          position=(last.position + 1) if last else 0)
+        return redirect("record-list", campaign_id=campaign.id, type_id=rtype.id)
+    return render(request, "campaigns/type_new.html", {"campaign": campaign, "form": form})

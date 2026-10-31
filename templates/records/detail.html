@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ record.name }} · {{ campaign.name }}{% endblock %}
+{% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a> › <a href="{% url 'record-list' campaign.id record.record_type_id %}">{{ record.record_type.name }}</a>{% endblock %}
+{% block content %}
+<h1>{{ record.name }}</h1>
+{% include "records/_tabs.html" %}
+{% if gallery %}
+<p class="muted">Sem imagens.</p>
+{% elif selected %}
+<h2>{{ selected.title }}</h2>
+<p class="muted">Sem conteúdo.</p>
+{% else %}
+<p class="muted">Este registro não tem abas. Use + para criar uma.</p>
+{% endif %}
+{% if record.record_type.listgroup_set.exists %}
+<form method="post" action="{% url 'record-group' record.id %}" class="form group-pick">
+  {% csrf_token %}
+  {{ group_form.as_div }}
+  <button class="btn" type="submit">Salvar</button>
+</form>
+{% endif %}
+{% endblock %}

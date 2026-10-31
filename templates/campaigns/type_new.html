@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Novo tipo · {{ campaign.name }}{% endblock %}
+{% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a>{% endblock %}
+{% block content %}
+<h1>Novo tipo</h1>
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ form.as_div }}
+  <button class="btn" type="submit">Criar tipo</button>
+</form>
+{% endblock %}

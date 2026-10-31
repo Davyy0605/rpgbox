@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ rtype.name }} · {{ campaign.name }}{% endblock %}
+{% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a>{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>{{ rtype.name }}</h1>
+  <a class="plus" href="{% url 'record-new' campaign.id rtype.id %}{% if current_group %}?g={{ current_group.id }}{% endif %}" aria-label="Novo registro em {{ rtype.name }}">+</a>
+</div>
+<form class="form" role="search"><input type="search" name="q" placeholder="Buscar" aria-label="Buscar"></form>
+<div class="seg" role="group" aria-label="Exibição">
+  <a href="?{% if current_group %}g={{ current_group.id }}{% endif %}" class="{% if not gallery %}on{% endif %}">Lista</a>
+  <a href="?v=galeria{% if current_group %}&amp;g={{ current_group.id }}{% endif %}" class="{% if gallery %}on{% endif %}">Galeria</a>
+</div>
+<nav class="strip" aria-label="Sub-abas da lista">
+  <a href="?{% if gallery %}v=galeria{% endif %}" class="{% if not current_group %}on{% endif %}">Todas</a>
+  {% for g in groups %}<a href="?g={{ g.id }}{% if gallery %}&amp;v=galeria{% endif %}" class="{% if g == current_group %}on{% endif %}">{{ g.name }}</a>{% endfor %}
+  <details class="add"><summary aria-label="Nova sub-aba">+</summary>
+    <form method="post" action="{% url 'group-add' campaign.id rtype.id %}">{% csrf_token %}
+      <input name="name" placeholder="Nome" aria-label="Nome da sub-aba" required maxlength="80"><button class="btn" type="submit">Criar</button>
+    </form>
+  </details>
+</nav>
+{% if gallery %}
+<ul class="grid">
+  {% for r in records %}<li><a class="tile" href="{% url 'record-detail' r.id %}" hx-get="{% url 'record-panel' r.id %}" hx-target="#panel">{{ r.name }}</a></li>{% empty %}<li class="muted">Nenhum registro.</li>{% endfor %}
+</ul>
+{% else %}
+<ul class="list">
+  {% for r in records %}<li><a href="{% url 'record-detail' r.id %}" hx-get="{% url 'record-panel' r.id %}" hx-target="#panel">{{ r.name }}</a></li>{% empty %}<li class="muted">Nenhum registro.</li>{% endfor %}
+</ul>
+{% endif %}
+<div id="panel"></div>
+{% endblock %}

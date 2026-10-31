@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Novo em {{ rtype.name }} · {{ campaign.name }}{% endblock %}
+{% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a> › <a href="{% url 'record-list' campaign.id rtype.id %}">{{ rtype.name }}</a>{% endblock %}
+{% block content %}
+<h1>Novo em {{ rtype.name }}</h1>
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ form.as_div }}
+  <button class="btn" type="submit">Criar</button>
+</form>
+{% endblock %}
