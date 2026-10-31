@@ -12,6 +12,15 @@ async function initPdf(root) {
   label.setAttribute("aria-live", "polite");
   const prev = button("Anterior");
   const next = button("Próxima");
+  const problem = document.createElement("p");
+  problem.setAttribute("role", "alert");
+  problem.hidden = true;
+  problem.append("Não foi possível mostrar esta página. ");
+  const openLink = document.createElement("a");
+  openLink.className = "btn-link";
+  openLink.href = url;
+  openLink.textContent = "Abrir PDF";
+  problem.append(openLink);
   const bar = document.createElement("div");
   bar.className = "pdf-bar";
   bar.append(prev, label, next);
@@ -27,21 +36,30 @@ async function initPdf(root) {
       return;
     }
     busy = true;
-    number = n;
-    const page = await pdf.getPage(n);
-    const base = page.getViewport({ scale: 1 });
-    const width = Math.max(root.clientWidth, 200);
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    const viewport = page.getViewport({ scale: (width / base.width) * ratio });
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    canvas.style.width = "100%";
-    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-    page.cleanup();
-    label.textContent = `Página ${n} de ${pdf.numPages}`;
-    prev.disabled = n <= 1;
-    next.disabled = n >= pdf.numPages;
-    busy = false;
+    try {
+      const page = await pdf.getPage(n);
+      const base = page.getViewport({ scale: 1 });
+      const width = Math.max(root.clientWidth, 200);
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const viewport = page.getViewport({ scale: (width / base.width) * ratio });
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      canvas.style.width = "100%";
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      page.cleanup();
+      number = n;
+      problem.hidden = true;
+    } catch {
+      // A página falhou: limpa o desenho antigo, mantém a navegação e o link para abrir o arquivo.
+      number = n;
+      canvas.width = canvas.width;
+      problem.hidden = false;
+    } finally {
+      busy = false;
+    }
+    label.textContent = `Página ${number} de ${pdf.numPages}`;
+    prev.disabled = number <= 1;
+    next.disabled = number >= pdf.numPages;
     if (pending !== null) {
       const again = pending;
       pending = null;
@@ -54,7 +72,7 @@ async function initPdf(root) {
 
   try {
     pdf = await pdfjs.getDocument({ url }).promise;
-    root.replaceChildren(canvas);
+    root.replaceChildren(canvas, problem);
     if (pdf.numPages > 1) root.append(bar);
     await show(1);
   } catch {
