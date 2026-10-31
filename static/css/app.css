@@ -93,6 +93,10 @@ select, input[type=file], textarea { max-width: 100%; min-height: 44px; padding:
 .pdf-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .dropzone { border: 1px dashed transparent; border-radius: 6px; padding: 8px 0; }
 .dropzone.over { border-color: currentColor; }
+.confirm summary { list-style: none; cursor: pointer; color: var(--muted); font-size: .9rem; }
+.confirm summary::-webkit-details-marker { display: none; }
+.confirm[open] { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+[data-dropzone][aria-busy=true]::after { content: "Enviando..."; display: block; padding: 8px 0; color: var(--accent); }
 
 /* Registro: campos e editor */
 .fields { margin-bottom: 16px; }

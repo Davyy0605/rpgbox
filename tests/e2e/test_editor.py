@@ -130,7 +130,7 @@ def test_editor_keeps_text_from_the_doc_and_saves_with_the_version(page, live_se
     saved(page, lambda: page.keyboard.type("!"), "texto mais!")
     assert texts(block_of(character)) == ["texto mais!"]
     assert block_of(character).version >= 2
-    expect(page.get_by_role("button", name="Remover bloco")).to_be_visible()
+    expect(page.get_by_text("Remover bloco")).to_be_visible()
     assert page.locator("[data-editor] form").count() == 0
 
 

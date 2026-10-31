@@ -7,7 +7,7 @@
   {% if panel.section %}<div class="sheet-section">{{ panel.section }}</div>{% else %}
   {% if panel.record.main_image %}<img class="thumb-img" src="{% url 'asset-file' panel.record.main_image_id %}?v=thumb&amp;inline=1" alt="{{ panel.record.name }}">{% else %}<div class="thumb" aria-hidden="true">{{ panel.record.name }}</div>{% endif %}
   <dl>
-    {% for f, value in panel.fields %}{% if value != "" and value != None %}<dt class="muted">{{ f.label }}</dt><dd>{{ value }}</dd>{% endif %}{% endfor %}
+    {% for f, value, copy in panel.fields %}{% if value != "" and value != None %}<dt class="muted">{{ f.label }}</dt><dd>{{ value }}{% if copy %} <button class="btn-link" type="button" data-copy="{{ copy }}">Copiar link</button>{% endif %}</dd>{% endif %}{% endfor %}
   </dl>{% endif %}
   <a class="btn-link" href="{{ panel.crumb_url }}">Expandir</a>
 </section>

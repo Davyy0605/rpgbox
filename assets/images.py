@@ -32,9 +32,9 @@ def process_image(file):
         file.seek(0)
         img = Image.open(file, formats=ALLOWED_FORMATS)
         pixels = img.size[0] * img.size[1]  # lido do cabeçalho, antes de decodificar
-        if pixels > (MAX_PIXELS_JPEG if img.format == "JPEG" else MAX_PIXELS_OTHER):
+        if pixels > (MAX_PIXELS_JPEG if img.format in ("JPEG", "MPO") else MAX_PIXELS_OTHER):
             raise InvalidFile("A imagem tem pixels demais. Reduza a resolução e envie de novo.")
-        if img.format == "JPEG":
+        if img.format in ("JPEG", "MPO"):
             img.draft("RGB", (3200, 3200))
         img.seek(0)  # GIF animado: só o primeiro quadro
         img.load()

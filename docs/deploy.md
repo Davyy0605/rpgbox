@@ -86,7 +86,7 @@ Se você escolher B ou C, avise para registrarmos aqui.
 | `R2_SECRET_ACCESS_KEY` | segredo do R2 |
 | `ALLOWED_HOSTS` | o endereço do site sem `https://`, ex.: `rpgbox.onrender.com` (vários: separados por vírgula) |
 
-   `SECRET_KEY` é gerada sozinha pelo Render. **Não** crie a variável `DEBUG` (sem ela o site roda em modo de produção).
+   `SECRET_KEY` é gerada sozinha pelo Render. **Não** crie a variável `DEBUG` (sem ela o site roda em modo de produção). `DATABASE_URL` e `R2_BUCKET` são obrigatórios nesse modo: se um estiver vazio, o build falha na hora com uma mensagem clara, em vez de o site rodar em banco e disco que o Render apaga a cada reinício.
 5. Confirme. O primeiro build leva alguns minutos e já roda as migrações.
    Se o build falhar dizendo que a versão do Python não existe ou não é aceita, abra o serviço no Render, vá em **Environment** e troque `PYTHON_VERSION` por uma versão completa mais antiga (por exemplo `3.13.5`, o formato exige os três números). O código foi testado só no 3.14.3; em outra versão, rode os testes (`pytest --ignore=tests/e2e`) antes de confiar.
 6. Quando ficar "Live", abra `https://SEU-SITE.onrender.com/health`: deve mostrar `ok`.

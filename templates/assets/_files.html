@@ -2,7 +2,7 @@
 <ul class="list">
   {% for a in files %}
   <li class="file-row"><a href="{% url 'asset-open' a.id %}">{{ a.filename }}</a>
-    <form method="post" action="{% url 'asset-delete' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Excluir</button></form></li>
+    <details class="confirm"><summary class="btn-link">Excluir</summary><form method="post" action="{% url 'asset-delete' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Confirmar exclusão</button></form></details></li>
   {% endfor %}
 </ul>
 {% endif %}

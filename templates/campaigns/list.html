@@ -6,6 +6,7 @@
   {% for c in campaigns %}<li><a href="{% url 'campaign-home' c.id %}">{{ c.name }}</a></li>{% empty %}<li class="muted">Nenhuma campanha ainda.</li>{% endfor %}
 </ul>
 <p class="muted">Espaço usado: {{ storage_mb }} MB</p>
+<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn-link" type="submit">Sair</button></form>
 <form method="post" class="form">
   {% csrf_token %}
   {{ form.as_div }}
