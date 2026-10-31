@@ -8,11 +8,26 @@
 {% include "assets/_gallery.html" %}
 {% elif selected %}
 <h2>{{ selected.title }}</h2>
-<p class="muted">Sem conteúdo.</p>
+{% for item in blocks %}{% include "records/_block.html" %}{% empty %}<p class="muted">Sem conteúdo.</p>{% endfor %}
+<div class="block-actions">
+  <form method="post" action="{% url 'block-add' selected.id %}">{% csrf_token %}<button class="btn" type="submit">+ Texto</button></form>
+  <form method="post" action="{% url 'embed-add' selected.id %}" class="form">{% csrf_token %}
+    <input type="number" name="record" placeholder="Número do registro" aria-label="Registro a incorporar" required>
+    <input type="text" name="anchor" maxlength="64" placeholder="Título (opcional)" aria-label="Âncora do título">
+    <button class="btn" type="submit">Incorporar</button>
+  </form>
+</div>
 {% include "assets/_gallery.html" %}
 {% else %}
 <p class="muted">Este registro não tem abas. Use + para criar uma.</p>
 {% endif %}
+<details class="add"><summary>Renomear ou apagar</summary>
+  <form method="post" action="{% url 'record-rename' record.id %}" class="form">{% csrf_token %}
+    <input name="name" value="{{ record.name }}" maxlength="160" aria-label="Novo nome" required>
+    <button class="btn" type="submit">Renomear</button>
+  </form>
+  <a class="btn-link" href="{% url 'record-delete' record.id %}">Apagar registro</a>
+</details>
 {% if citations %}
 <section class="cited"><h2>Citado em</h2>
   <ul class="list">{% for c in citations %}<li><a href="{% url 'record-detail' c.id %}">{{ c.name }} <span class="muted">{{ c.record_type.name }}</span></a></li>{% endfor %}</ul>

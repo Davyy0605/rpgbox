@@ -20,3 +20,7 @@ class GroupChoiceForm(forms.Form):
 
 class TitleForm(forms.Form):
     title = forms.CharField(max_length=80)
+
+
+class RenameForm(forms.Form):
+    name = forms.CharField(max_length=160)

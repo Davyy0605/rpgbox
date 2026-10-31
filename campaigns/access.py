@@ -12,3 +12,17 @@ def get_record(user, record_id):
 
     return get_object_or_404(Record.objects.select_related("campaign", "record_type"),
                              pk=record_id, campaign__owner=user)
+
+
+def get_tab(user, tab_id):
+    from records.models import Tab
+
+    return get_object_or_404(Tab.objects.select_related("record__campaign", "record__record_type"),
+                             pk=tab_id, record__campaign__owner=user)
+
+
+def get_block(user, block_id):
+    from records.models import Block
+
+    return get_object_or_404(Block.objects.select_related("tab__record__campaign", "tab__record__record_type"),
+                             pk=block_id, tab__record__campaign__owner=user)

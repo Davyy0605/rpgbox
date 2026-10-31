@@ -1,0 +1,9 @@
+{% if item.block.kind == "embed" %}{% include "records/_embed.html" with view=item.embed block=item.block %}
+{% else %}
+<div class="block text-block" data-editor="text" data-block="{{ item.block.id }}"
+     data-save-url="{% url 'block-save' item.block.id %}" data-version="{{ item.block.version }}"
+     data-suggest-url="{% url 'suggest' campaign.id %}">
+  {{ item.html }}
+  <form method="post" action="{% url 'block-delete' item.block.id %}">{% csrf_token %}<button class="btn-link" type="submit">Remover bloco</button></form>
+</div>
+{% endif %}

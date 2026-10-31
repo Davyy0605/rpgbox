@@ -1,14 +1,21 @@
+import json
+
 from django.contrib.auth.decorators import login_required
-from django.http import Http404
+from django.core.exceptions import ValidationError
+from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from campaigns.access import get_campaign, get_record
+from campaigns.access import get_block, get_campaign, get_record, get_tab
+from content.render import render_doc
 from campaigns.models import ListGroup
 
-from indexing.services import citations
+from indexing.services import citations, resolver_for
 
-from .forms import GroupChoiceForm, RecordForm, TitleForm
+from .forms import GroupChoiceForm, RecordForm, RenameForm, TitleForm
+from .models import Record
+from .save import (add_embed, add_text_block, delete_block, delete_preview, rename_record, resolve_embed,
+                   save_block, save_field)
 from .services import add_record_tab, add_subtab, create_record, visible_fields, visible_tabs
 
 
@@ -72,12 +79,14 @@ def record_detail(request, record_id):
                     selected, parent = cand, t
         if selected is None and tabs:
             selected = parent = tabs[0]
+    blocks = _block_views(selected, record) if selected is not None and not gallery else []
     assets = record.asset_set.all()
     scope_tab = None if gallery or selected is None else selected.id
     return render(request, "records/detail.html", {
         "images": [a for a in assets if a.kind == "image" and a.tab_id == scope_tab],
         "files": [a for a in assets if a.kind != "image" and a.tab_id == scope_tab],
         "upload_tab": scope_tab,
+        "blocks": blocks,
         "record": record, "campaign": record.campaign, "tabs": tabs, "selected": selected,
         "parent": parent, "gallery": gallery, "citations": citations(record), "fields": visible_fields(record),
         "group_form": GroupChoiceForm(record.record_type, initial={"group": record.group_id}),
@@ -122,3 +131,115 @@ def subtab_add(request, record_id, tab_id):
         return redirect(f"/r/{record.id}/?aba={parent.id}")
     sub = add_subtab(parent, form.cleaned_data["title"])
     return redirect(f"/r/{record.id}/?aba={sub.id}")
+
+
+def _block_views(tab, record):
+    resolver = resolver_for(record.campaign)
+    out = []
+    for b in tab.block_set.order_by("position", "id"):
+        if b.kind == "embed":
+            out.append({"block": b, "embed": resolve_embed(b)})
+        else:
+            out.append({"block": b, "html": render_doc(b.content, resolver)})
+    return out
+
+
+def _json_body(request):
+    try:
+        data = json.loads(request.body)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _version(data):
+    v = data.get("version")
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+@login_required
+@require_POST
+def block_add(request, tab_id):
+    tab = get_tab(request.user, tab_id)
+    add_text_block(tab)
+    return redirect(f"/r/{tab.record_id}/?aba={tab.id}")
+
+
+@login_required
+@require_POST
+def embed_add(request, tab_id):
+    tab = get_tab(request.user, tab_id)
+    try:
+        target_id = int(request.POST.get("record", ""))
+    except ValueError:
+        return HttpResponseBadRequest("Registro inválido.")
+    target = get_object_or_404(Record, pk=target_id, campaign_id=tab.record.campaign_id)
+    try:
+        add_embed(tab, target, request.POST.get("anchor", "").strip())
+    except ValidationError:
+        return HttpResponseBadRequest("Origem inválida.")
+    return redirect(f"/r/{tab.record_id}/?aba={tab.id}")
+
+
+@login_required
+@require_POST
+def block_save(request, block_id):
+    block = get_block(request.user, block_id)
+    data = _json_body(request)
+    version = _version(data) if data is not None else None
+    if version is None or block.kind != "text":
+        return JsonResponse({"error": "Requisição inválida."}, status=400)
+    try:
+        result = save_block(block, data.get("content"), version)
+    except ValidationError:
+        return JsonResponse({"error": "Documento inválido."}, status=400)
+    if not result.ok:
+        return JsonResponse({"version": result.version, "content": result.current_content}, status=409)
+    return JsonResponse({"version": result.version})
+
+
+@login_required
+@require_POST
+def block_delete(request, block_id):
+    block = get_block(request.user, block_id)
+    tab = block.tab
+    delete_block(block)
+    return redirect(f"/r/{tab.record_id}/?aba={tab.id}")
+
+
+@login_required
+@require_POST
+def field_save(request, record_id):
+    record = get_record(request.user, record_id)
+    data = _json_body(request)
+    version = _version(data) if data is not None else None
+    if version is None or not isinstance(data.get("key"), str):
+        return JsonResponse({"error": "Requisição inválida."}, status=400)
+    try:
+        result = save_field(record, data["key"], data.get("value"), version)
+    except ValidationError:
+        return JsonResponse({"error": "Valor inválido."}, status=400)
+    if not result.ok:
+        return JsonResponse({"version": result.version, "value": result.current_content}, status=409)
+    return JsonResponse({"version": result.version})
+
+
+@login_required
+@require_POST
+def record_rename(request, record_id):
+    record = get_record(request.user, record_id)
+    form = RenameForm({"name": request.POST.get("name", "").strip()})
+    if form.is_valid():
+        rename_record(record, form.cleaned_data["name"])
+    return redirect("record-detail", record_id=record.id)
+
+
+@login_required
+def record_delete(request, record_id):
+    record = get_record(request.user, record_id)
+    if request.method == "POST":
+        rtype_id, campaign_id = record.record_type_id, record.campaign_id
+        record.delete()
+        return redirect("record-list", campaign_id=campaign_id, type_id=rtype_id)
+    return render(request, "records/delete.html", {
+        "record": record, "campaign": record.campaign, "uses": delete_preview(record)})
