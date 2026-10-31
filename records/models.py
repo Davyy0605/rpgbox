@@ -23,6 +23,7 @@ class Tab(models.Model):
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE, related_name="subtabs")
     title = models.CharField(max_length=80)
     position = models.PositiveIntegerField(default=0)
+    hidden = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title

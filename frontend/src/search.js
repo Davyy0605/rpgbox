@@ -43,6 +43,7 @@ function initListFilter() {
     const wanted = fold(input.value.trim());
     let shown = 0;
     for (const { row, name } of rows) {
+      if (!row.isConnected) continue;
       row.hidden = !name.includes(wanted);
       if (!row.hidden) shown += 1;
     }

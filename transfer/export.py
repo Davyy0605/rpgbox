@@ -98,7 +98,7 @@ def _record_markdown(record, resolve):
     if rows:
         lines.append("\n".join(rows))
     lines.extend(longs)
-    tabs = list(Tab.objects.filter(record=record).order_by("position", "id"))
+    tabs = list(Tab.objects.filter(record=record, hidden=False).order_by("position", "id"))
     blocks_by_tab = {}
     for b in Block.objects.filter(tab__record=record).select_related("embed_record").order_by("position", "id"):
         blocks_by_tab.setdefault(b.tab_id, []).append(b)

@@ -2,15 +2,16 @@ import json
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import Http404, HttpResponseBadRequest, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from campaigns.access import get_block, get_campaign, get_record, get_tab
+from campaigns.access import deleted, get_block, get_campaign, get_record, get_tab
 from content.doc import SEP, as_doc, headings, safe_href
 from content.render import editor_doc, render_doc
 from campaigns.models import ListGroup
+from campaigns.template_views import template_body
 
 from indexing.services import citations, resolver_for
 
@@ -19,7 +20,7 @@ from .models import Record
 from .sections import find_section
 from .save import (add_embed, add_text_block, delete_block, delete_preview, first_text_block, rename_record,
                    resolve_embed, save_block, save_field)
-from .services import add_record_tab, add_subtab, create_record, visible_fields, visible_tabs
+from .services import add_record_tab, add_subtab, create_record, delete_tab, visible_fields, visible_tabs
 
 
 def _type(user, campaign_id, type_id):
@@ -32,12 +33,9 @@ def record_list(request, campaign_id, type_id):
     campaign, rtype = _type(request.user, campaign_id, type_id)
     groups = list(rtype.listgroup_set.order_by("position", "id"))
     records = rtype.record_set.select_related("main_image").order_by("name")
-    current = None
-    g = request.GET.get("g", "")
-    if g:
-        current = next((x for x in groups if str(x.id) == g), None)
-        if current is None:
-            raise Http404
+    # Sub-aba desconhecida mostra "Todas": o voltar pode trazer o endereço de uma que já foi apagada.
+    current = next((x for x in groups if str(x.id) == request.GET.get("g", "")), None)
+    if current:
         records = records.filter(group=current)
     link = rtype.fielddef_set.filter(kind="link", removed=False).order_by("position", "id").first()
     return render(request, "records/list.html", {
@@ -61,14 +59,35 @@ def record_new(request, campaign_id, type_id):
 @login_required
 @require_POST
 def group_add(request, campaign_id, type_id):
-    _, rtype = _type(request.user, campaign_id, type_id)
+    campaign, rtype = _type(request.user, campaign_id, type_id)
     form = TitleForm({"title": request.POST.get("name", "").strip()})
     if not form.is_valid():
         return redirect("record-list", campaign_id=campaign_id, type_id=type_id)
     last = rtype.listgroup_set.order_by("-position").first()
     group = ListGroup.objects.create(record_type=rtype, name=form.cleaned_data["title"],
                                      position=(last.position + 1) if last else 0)
+    if request.headers.get("HX-Target") == "modelo":
+        return template_body(request, rtype)
+    if "HX-Request" in request.headers:
+        return render(request, "records/_groups.html", _groups_context(request, campaign, rtype, group))
     return redirect(f"/c/{campaign_id}/t/{type_id}/?g={group.id}")
+
+
+def _groups_context(request, campaign, rtype, new_group):
+    """A faixa de sub-abas continua no filtro em que a lista estava."""
+    groups = list(rtype.listgroup_set.order_by("position", "id"))
+    current = next((x for x in groups if str(x.id) == request.POST.get("g")), None)
+    return {"campaign": campaign, "rtype": rtype, "groups": groups, "current_group": current,
+            "gallery": request.POST.get("v") == "galeria", "new_group": new_group.id}
+
+
+def _select_tab(tabs, key):
+    """A aba aberta e a de topo dela; sem `key` válida, a primeira."""
+    for t in tabs:
+        for cand in [t, *t.children]:
+            if str(cand.id) == key:
+                return cand, t
+    return (tabs[0], tabs[0]) if tabs else (None, None)
 
 
 @login_required
@@ -81,14 +100,7 @@ def record_detail(request, record_id):
     if found_tab and not selected_key:
         selected_key = str(found_tab)
     gallery = selected_key == "galeria"
-    selected = parent = None
-    if not gallery:
-        for t in tabs:
-            for cand in [t, *t.children]:
-                if str(cand.id) == selected_key:
-                    selected, parent = cand, t
-        if selected is None and tabs:
-            selected = parent = tabs[0]
+    selected, parent = (None, None) if gallery else _select_tab(tabs, selected_key)
     blocks = _block_views(selected, record) if selected is not None and not gallery else []
     assets = record.asset_set.all()
     scope_tab = None if gallery or selected is None else selected.id
@@ -129,20 +141,41 @@ def tab_add(request, record_id):
     form = TitleForm({"title": request.POST.get("title", "").strip()})
     if not form.is_valid():
         return redirect("record-detail", record_id=record.id)
-    tab = add_record_tab(record, form.cleaned_data["title"])
-    return redirect(f"/r/{record.id}/?aba={tab.id}")
+    return _tab_added(request, record, add_record_tab(record, form.cleaned_data["title"]))
 
 
 @login_required
 @require_POST
 def subtab_add(request, record_id, tab_id):
     record = get_record(request.user, record_id)
-    parent = get_object_or_404(record.tab_set, pk=tab_id)
+    parent = get_object_or_404(record.tab_set.filter(hidden=False), pk=tab_id)
     form = TitleForm({"title": request.POST.get("title", "").strip()})
     if not form.is_valid() or parent.parent_id:
         return redirect(f"/r/{record.id}/?aba={parent.id}")
-    sub = add_subtab(parent, form.cleaned_data["title"])
-    return redirect(f"/r/{record.id}/?aba={sub.id}")
+    return _tab_added(request, record, add_subtab(parent, form.cleaned_data["title"]))
+
+
+def _tab_added(request, record, tab):
+    """Com htmx, troca só a faixa de abas: abrir a aba nova destruiria os editores da aba aberta."""
+    url = f"/r/{record.id}/?aba={tab.id}"
+    key = request.POST.get("aba", "")
+    if "HX-Request" not in request.headers:
+        return redirect(url)
+    if not key:  # o registro não tinha aba nenhuma: não há editor de aba a preservar, e a tela precisa mudar
+        return HttpResponse(headers={"HX-Redirect": url})
+    tabs = visible_tabs(record)
+    gallery = key == "galeria"
+    selected, parent = (None, None) if gallery else _select_tab(tabs, key)
+    return render(request, "records/_tabs.html", {
+        "record": record, "tabs": tabs, "selected": selected, "parent": parent, "gallery": gallery, "new_tab": tab.id})
+
+
+@login_required
+@require_POST
+def tab_delete(request, tab_id):
+    tab = get_tab(request.user, tab_id)
+    delete_tab(tab)
+    return deleted(request, redirect("record-detail", record_id=tab.record_id))
 
 
 def _with_copy_links(records, link):
@@ -211,6 +244,12 @@ def _new_block_editor(tab):
     return _editor("text", None, None, f"aba-{tab.id}", "Texto", create_url=reverse("block-add", args=[tab.id]))
 
 
+def _text_view(block, resolver, orphan_url=None):
+    return {"block": block, "editor": _editor("text", block.content, resolver, f"bloco-{block.id}", "Texto",
+                                              save_url=reverse("block-save", args=[block.id]),
+                                              version=block.version, orphan_url=orphan_url)}
+
+
 def _block_views(tab, record):
     resolver = resolver_for(record.campaign)
     out = []
@@ -220,9 +259,7 @@ def _block_views(tab, record):
         if b.kind == "embed":
             out.append({"block": b, "embed": resolve_embed(b)})
         else:
-            out.append({"block": b, "editor": _editor("text", b.content, resolver, f"bloco-{b.id}", "Texto",
-                                                      save_url=reverse("block-save", args=[b.id]),
-                                                      version=b.version, orphan_url=orphan_url)})
+            out.append(_text_view(b, resolver, orphan_url))
             orphan_url = None
     return out
 
@@ -251,6 +288,9 @@ def block_add(request, tab_id):
     if request.headers.get("Accept") == "application/json":
         answer = {"save_url": reverse("block-save", args=[block.id]), "version": block.version}
         return JsonResponse(answer if created else {**answer, "content": block.content})
+    if "HX-Request" in request.headers:  # só o bloco novo: os editores abertos seguem com o texto e o salvamento deles
+        return render(request, "records/_block.html", {
+            "item": _text_view(block, resolver_for(tab.record.campaign)), "campaign": tab.record.campaign})
     return redirect(f"/r/{tab.record_id}/?aba={tab.id}")
 
 
@@ -264,9 +304,12 @@ def embed_add(request, tab_id):
         return HttpResponseBadRequest("Registro inválido.")
     target = get_object_or_404(Record, pk=target_id, campaign_id=tab.record.campaign_id)
     try:
-        add_embed(tab, target, request.POST.get("anchor", "").strip())
+        block = add_embed(tab, target, request.POST.get("anchor", "").strip())
     except ValidationError:
         return HttpResponseBadRequest("Origem inválida.")
+    if "HX-Request" in request.headers:
+        return render(request, "records/_block.html", {
+            "item": {"block": block, "embed": resolve_embed(block)}, "campaign": tab.record.campaign})
     return redirect(f"/r/{tab.record_id}/?aba={tab.id}")
 
 
@@ -293,6 +336,8 @@ def block_delete(request, block_id):
     block = get_block(request.user, block_id)
     tab = block.tab
     delete_block(block)
+    if "HX-Request" in request.headers:
+        return HttpResponse()
     return redirect(f"/r/{tab.record_id}/?aba={tab.id}")
 
 
@@ -329,6 +374,6 @@ def record_delete(request, record_id):
     if request.method == "POST":
         rtype_id, campaign_id = record.record_type_id, record.campaign_id
         record.delete()
-        return redirect("record-list", campaign_id=campaign_id, type_id=rtype_id)
+        return deleted(request, redirect("record-list", campaign_id=campaign_id, type_id=rtype_id))
     return render(request, "records/delete.html", {
         "record": record, "campaign": record.campaign, "uses": delete_preview(record)})

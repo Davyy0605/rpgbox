@@ -136,7 +136,7 @@ def copy_record(record, dest) -> Record:
             for t in tabs:
                 tab_map[t.id] = Tab.objects.create(
                     record=new, tab_def=_tabdef_for(t.tab_def, dest_defs), parent=tab_map.get(t.parent_id),
-                    title=t.title, position=t.position)
+                    title=t.title, position=t.position, hidden=t.hidden)
 
             for b in Block.objects.filter(tab__record=record).select_related("embed_record").order_by("tab_id", "position", "id"):
                 content = _frozen_embed(b, resolve) if b.kind == "embed" else _plain(b.content, resolve)

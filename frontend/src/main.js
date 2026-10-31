@@ -2,8 +2,10 @@ import { attachAutosave, attachFieldAutosave, draftKey } from "./autosave.js";
 import { destroyDetachedEditors, initEditor, isUnreadable } from "./editor.js";
 import { initPicker } from "./picker.js";
 import { initCopy } from "./copy.js";
+import { initDelete } from "./delete.js";
 import { initSearch } from "./search.js";
 import { initSheet } from "./sheet.js";
+import { initSwaps } from "./swap.js";
 import { initTrail } from "./trail.js";
 import { initUpload } from "./upload.js";
 
@@ -57,6 +59,8 @@ function start() {
   initSearch();
   initTrail();
   initSheet();
+  initDelete();
+  initSwaps();
   document.body.addEventListener("htmx:afterSwap", (event) => {
     destroyDetachedEditors();
     activate(event.detail.target);
