@@ -46,9 +46,19 @@ def paste(page, selector, html):
         }""", html)
 
 
-def saved(page, trigger):
-    """Roda `trigger` e devolve a resposta do envio do campo que ele causou."""
-    with page.expect_response(lambda r: "/campos/" in r.url) as info:
+def saved(page, trigger, content=""):
+    """Roda `trigger` e espera o envio que traz `content`, um trecho do corpo ou uma função sobre ele.
+
+    Esperar a resposta, e não consultar o banco em laço: no SQLite em memória o teste
+    e o servidor dividem a conexão, e ler durante uma escrita dá "table is locked".
+    """
+    matches = content if callable(content) else lambda body: content in body
+
+    def is_it(response):
+        body = response.request.post_data or ""
+        return ("/blocos/" in response.url or "/campos/" in response.url) and bool(body) and matches(body)
+
+    with page.expect_response(is_it) as info:
         trigger()
     assert info.value.status == 200, info.value.text()
     return info.value
@@ -58,21 +68,8 @@ def block_of(record):
     return Block.objects.filter(tab__record=record, kind="text").order_by("position", "id").first()
 
 
-def until(page, condition, timeout=10000):
-    """Espera o salvamento chegar ao banco: digitar devagar pode gerar mais de um envio."""
-    for _ in range(timeout // 100):
-        if condition():
-            return
-        page.wait_for_timeout(100)
-    assert condition()
-
-
 def texts(block):
-    return [n["text"] for n in iter_nodes(block.content) if n["type"] == "text"] if block else []
-
-
-def has_node(block, kind):
-    return any(n["type"] == kind for n in iter_nodes(block.content))
+    return [n["text"] for n in iter_nodes(block.content) if n["type"] == "text"]
 
 
 def test_at_mention_inserts_link(page, live_server, logged_in, character, elf):
@@ -98,8 +95,7 @@ def test_mention_survives_save_and_reload_with_its_attrs(page, live_server, logg
     reindex_record(elf)
     page.goto(url_of(character)); page.locator(TEXT).click()
     page.keyboard.press("Control+End"); page.keyboard.type(" @visao")
-    page.get_by_role("option", name="Elfos › Visão no Escuro").click()
-    until(page, lambda: has_node(block_of(character), "mention"))
+    saved(page, page.get_by_role("option", name="Elfos › Visão no Escuro").click, '"mention"')
 
     mention = next(n for n in iter_nodes(block_of(character).content) if n["type"] == "mention")
     assert mention["attrs"] == {"record": elf.id, "anchor": "visao", "label": "Elfos › Visão no Escuro"}
@@ -131,8 +127,8 @@ def test_editor_keeps_text_from_the_doc_and_saves_with_the_version(page, live_se
     expect(page.locator(TEXT)).to_have_text("texto")
     page.locator(TEXT).click()
     page.keyboard.press("Control+End"); page.keyboard.type(" mais")
-    page.keyboard.type("!")
-    until(page, lambda: texts(block_of(character)) == ["texto mais!"])
+    saved(page, lambda: page.keyboard.type("!"), "texto mais!")
+    assert texts(block_of(character)) == ["texto mais!"]
     assert block_of(character).version >= 2
     expect(page.get_by_role("button", name="Remover bloco")).to_be_visible()
     assert page.locator("[data-editor] form").count() == 0
@@ -153,8 +149,7 @@ def test_new_heading_gets_anchor(page, live_server, logged_in, character):
     page.goto(url_of(character)); page.locator(TEXT).click()
     page.keyboard.press("Control+End"); page.keyboard.press("Enter")
     page.get_by_role("button", name="Título", exact=True).click()
-    page.keyboard.type("Origem")
-    until(page, lambda: "Origem" in texts(block_of(character)))
+    saved(page, lambda: page.keyboard.type("Origem"), "Origem")
     ((anchor, text),) = headings(block_of(character).content)
     assert text == "Origem" and re.fullmatch(r"h-[0-9a-f]{8}", anchor)
 
@@ -164,8 +159,7 @@ def test_changing_heading_level_keeps_its_anchor(page, live_server, logged_in, c
     page.goto(url_of(character)); page.locator(TEXT).click()
     page.get_by_role("button", name="Subtítulo").click()
     expect(page.locator(TEXT).locator("h3")).to_have_text("Origem")
-    page.keyboard.type("!")
-    until(page, lambda: "!" in "".join(texts(block_of(character))))
+    saved(page, lambda: page.keyboard.type("!"), "!")
     node = next(n for n in iter_nodes(block_of(character).content) if n["type"] == "heading")
     assert node["attrs"] == {"level": 3, "anchor": "origem"}
 
@@ -176,8 +170,7 @@ def test_pasted_duplicate_heading_gets_new_anchor_and_original_keeps_it(page, li
     set_body(character, content)
     page.goto(url_of(character)); page.locator(TEXT).click()
     page.keyboard.press("Control+Home")
-    paste(page, TEXT, '<h2 id="origem">Cópia</h2>')
-    until(page, lambda: "Cópia" in texts(block_of(character)))
+    saved(page, lambda: paste(page, TEXT, '<h2 id="origem">Cópia</h2>'), "Cópia")
     found = headings(block_of(character).content)
     assert [t for _, t in found] == ["Cópia", "Origem"] and len({a for a, _ in found}) == 2
     assert dict((t, a) for a, t in found)["Origem"] == "origem"
@@ -189,8 +182,8 @@ def test_splitting_a_heading_regenerates_the_second_anchor(page, live_server, lo
     page.keyboard.press("Control+End")
     for _ in range(6):
         page.keyboard.press("ArrowLeft")
-    page.keyboard.press("Enter")
-    until(page, lambda: len(headings(block_of(character).content)) == 2)
+    page.wait_for_timeout(300)  # o editor lê a seleção no selectionchange, depois da tecla
+    saved(page, lambda: page.keyboard.press("Enter"), lambda body: body.count('"heading"') == 2)
     first, second = headings(block_of(character).content)
     assert first[0] == "origem" and second[0] != "origem"
 
@@ -215,8 +208,7 @@ def test_suggestions_close_when_leaving_the_text(page, live_server, logged_in, c
 def test_google_docs_paste_keeps_structure_and_is_accepted(page, live_server, logged_in, character):
     page.goto(url_of(character)); page.locator(TEXT).click()
     page.keyboard.press("Control+End"); page.keyboard.press("Enter")
-    paste(page, TEXT, GOOGLE_DOCS)
-    until(page, lambda: "Origem" in texts(block_of(character)))
+    saved(page, lambda: paste(page, TEXT, GOOGLE_DOCS), "Origem")
     content = block_of(character).content
     assert validate_doc(content) == content
     nodes = list(iter_nodes(content))
@@ -245,8 +237,7 @@ def test_toolbar_marks_bold_and_italic(page, live_server, logged_in, character):
     assert box["height"] >= 44 and box["width"] >= 44
     toolbar.get_by_role("button", name="Negrito").click()
     expect(toolbar.get_by_role("button", name="Negrito")).to_have_attribute("aria-pressed", "true")
-    page.keyboard.type("duro")
-    until(page, lambda: "duro" in texts(block_of(character)))
+    saved(page, lambda: page.keyboard.type("duro"), "duro")
     assert block_of(character).content["content"][0]["content"][0]["marks"] == [{"type": "bold"}]
 
 
@@ -323,10 +314,8 @@ def test_empty_tab_lets_you_write_right_away(page, live_server, logged_in, campa
     assert not Block.objects.filter(tab__record=empty).exists()
     expect(page.get_by_role("button", name="+ Texto")).to_have_count(0)
     page.locator(TEXT).click()
-    page.keyboard.type("direto")
-    until(page, lambda: texts(block_of(empty)) == ["direto"])
-    page.keyboard.type("!")
-    until(page, lambda: texts(block_of(empty)) == ["direto!"])
+    saved(page, lambda: page.keyboard.type("direto"), "direto")
+    saved(page, lambda: page.keyboard.type("!"), "direto!")
     assert block_of(empty).content == doc("direto!")
     assert Block.objects.filter(tab__record=empty).count() == 1
     page.reload()
