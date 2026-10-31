@@ -1,0 +1,7 @@
+{% if item.block.kind == "embed" %}{% include "records/_embed.html" with view=item.embed block=item.block %}
+{% else %}
+<div class="block text-block">
+  {% include "records/_editor.html" with e=item.editor %}
+  <details class="confirm"><summary class="btn-link">Remover bloco</summary><form method="post" action="{% url 'block-delete' item.block.id %}">{% csrf_token %}<button class="btn-link" type="submit">Confirmar remoção</button></form></details>
+</div>
+{% endif %}

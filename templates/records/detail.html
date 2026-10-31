@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ record.name }} · {{ campaign.name }}{% endblock %}
+{% block crumb %} data-crumb="{{ crumb }}" data-crumb-url="{{ crumb_url }}"{% endblock %}
+{% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a> › <a href="{% url 'record-list' campaign.id record.record_type_id %}">{{ record.record_type.name }}</a>{% endblock %}
+{% block content %}
+<h1>{{ record.name }}</h1>
+{% if fields %}
+<section class="fields" aria-label="Campos">
+  {% for f in fields %}<div class="field">
+    {% if f.editor %}<span class="muted">{{ f.label }}</span>{% include "records/_editor.html" with e=f.editor %}
+    {% else %}<label class="muted" for="valor-{{ f.id }}">{{ f.label }}</label>
+    <input id="valor-{{ f.id }}" data-field="{{ f.kind }}" data-key="{{ f.key }}" data-save-url="{{ f.save_url }}" data-version="{{ f.version }}" value="{{ f.value|default_if_none:'' }}" maxlength="2000" autocomplete="off"{% if f.kind == "number" %} inputmode="decimal"{% elif f.kind == "link" %} type="url" inputmode="url"{% endif %}>
+    {% if f.href %}<a class="field-open" href="{{ f.href }}" target="_blank" rel="noopener noreferrer nofollow">Abrir</a>{% endif %}{% endif %}
+  </div>{% endfor %}
+</section>
+{% endif %}
+{% include "records/_tabs.html" %}
+{% if gallery %}
+{% include "assets/_gallery.html" %}
+{% elif selected %}
+<h2>{{ selected.title }}</h2>
+{% for item in blocks %}{% include "records/_block.html" %}{% empty %}<div class="block text-block">{% include "records/_editor.html" with e=new_block %}</div>{% endfor %}
+<div class="block-actions">
+  {% if blocks %}<form method="post" action="{% url 'block-add' selected.id %}">{% csrf_token %}<button class="btn" type="submit">+ Texto</button></form>{% endif %}
+  <details class="picker"><summary class="btn-link">Incorporar</summary>
+    <form method="post" action="{% url 'embed-add' selected.id %}" data-embed-picker data-suggest-url="{% url 'suggest' campaign.id %}" data-self="{{ record.id }}">{% csrf_token %}
+      <input type="hidden" name="record"><input type="hidden" name="anchor">
+      <input type="search" role="combobox" aria-label="Origem" aria-autocomplete="list" aria-expanded="false" placeholder="Registro ou título" autocomplete="off">
+    </form>
+  </details>
+</div>
+{% include "assets/_gallery.html" %}
+{% else %}
+<p class="muted">Este registro não tem abas. Use + para criar uma.</p>
+{% endif %}
+<details class="add"><summary>Renomear ou apagar</summary>
+  <form method="post" action="{% url 'record-rename' record.id %}" class="form">{% csrf_token %}
+    <input name="name" value="{{ record.name }}" maxlength="160" aria-label="Novo nome" required>
+    <button class="btn" type="submit">Renomear</button>
+  </form>
+  <a class="btn-link" href="{% url 'record-copy' record.id %}">Copiar para outra campanha</a>
+  <a class="btn-link" href="{% url 'record-delete' record.id %}">Apagar registro</a>
+</details>
+{% if citations %}
+<section class="cited"><h2>Citado em</h2>
+  <ul class="list">{% for c in citations %}<li><a href="{% url 'record-detail' c.id %}">{{ c.name }} <span class="muted">{{ c.record_type.name }}</span></a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if record.record_type.listgroup_set.exists %}
+<form method="post" action="{% url 'record-group' record.id %}" class="form group-pick">
+  {% csrf_token %}
+  {{ group_form.as_div }}
+  <button class="btn" type="submit">Salvar</button>
+</form>
+{% endif %}
+<div id="panel">{% if panel %}{% include "records/_panel.html" %}{% endif %}</div>
+{% endblock %}

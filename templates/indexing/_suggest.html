@@ -1,0 +1,4 @@
+<ul class="list" id="results">
+  {% for r in results %}<li><a href="{% url 'record-detail' r.record.id %}{% if r.anchor %}?trecho={{ r.anchor }}#{{ r.anchor }}{% endif %}">{{ r.label }} <span class="muted">{{ r.record.record_type.name }}</span></a></li>
+  {% empty %}{% if q %}<li class="muted">Nada encontrado.</li>{% endif %}{% endfor %}
+</ul>

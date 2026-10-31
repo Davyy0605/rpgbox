@@ -1,0 +1,19 @@
+<ul class="grid" data-gallery>
+  {% for a in images %}
+  <li class="gal-item">
+    <a href="{% url 'asset-open' a.id %}"><img src="{% url 'asset-file' a.id %}?v=thumb&amp;inline=1" alt="{{ a.filename }}" loading="lazy" class="gal-img"></a>
+    <div class="gal-actions">
+      {% if record.main_image_id == a.id %}<span class="muted">Principal</span>{% else %}
+      <form method="post" action="{% url 'asset-main' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Tornar principal</button></form>{% endif %}
+      <details class="confirm"><summary class="btn-link">Excluir</summary><form method="post" action="{% url 'asset-delete' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Confirmar exclusão</button></form></details>
+    </div>
+  </li>
+  {% empty %}{% if not files %}<li class="muted">Sem arquivos.</li>{% endif %}{% endfor %}
+</ul>
+{% include "assets/_files.html" %}
+<form method="post" action="{% url 'asset-upload' record.id %}" enctype="multipart/form-data" class="form dropzone">
+  {% csrf_token %}
+  {% if upload_tab %}<input type="hidden" name="tab" value="{{ upload_tab }}">{% endif %}
+  <div data-dropzone><input type="file" name="file" aria-label="Adicionar arquivo, ou arraste e cole aqui" required></div>
+  <button class="btn" type="submit">Enviar</button>
+</form>

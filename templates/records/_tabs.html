@@ -1,0 +1,19 @@
+<nav class="strip" aria-label="Abas">
+  {% for t in tabs %}<a href="?aba={{ t.id }}" class="{% if t == parent %}on{% endif %}">{{ t.title }}</a>{% endfor %}
+  <details class="add"><summary aria-label="Nova aba">+</summary>
+    <form method="post" action="{% url 'tab-add' record.id %}">{% csrf_token %}
+      <input name="title" placeholder="Nome" aria-label="Nome da aba" required maxlength="80"><button class="btn" type="submit">Criar</button>
+    </form>
+  </details>
+  <a href="?aba=galeria" class="{% if gallery %}on{% endif %} gal faint">Galeria</a>
+</nav>
+{% if parent %}
+<nav class="strip sub" aria-label="Sub-abas">
+  {% for c in parent.children %}<a href="?aba={{ c.id }}" class="{% if c == selected %}on{% endif %}">{{ c.title }}</a>{% endfor %}
+  <details class="add"><summary aria-label="Nova sub-aba">+</summary>
+    <form method="post" action="{% url 'subtab-add' record.id parent.id %}">{% csrf_token %}
+      <input name="title" placeholder="Nome" aria-label="Nome da sub-aba" required maxlength="80"><button class="btn" type="submit">Criar</button>
+    </form>
+  </details>
+</nav>
+{% endif %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Busca · {{ campaign.name }}{% endblock %}
+{% block topsearch %}{% endblock %}
+{% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a>{% endblock %}
+{% block content %}
+<h1>Busca</h1>
+<form class="form" role="search" action="{% url 'search' campaign.id %}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Buscar" aria-label="Buscar" data-search-input autofocus>
+</form>
+{% include "indexing/_suggest.html" %}
+{% endblock %}

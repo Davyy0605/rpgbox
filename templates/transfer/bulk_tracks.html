@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Colar trilhas · {{ campaign.name }}{% endblock %}
+{% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a> › <a href="{% url 'record-list' campaign.id rtype.id %}">{{ rtype.name }}</a>{% endblock %}
+{% block content %}
+<h1>Colar {{ rtype.name|lower }}</h1>
+{% if done is not None %}
+<p role="status">{{ done }} trilha{{ done|pluralize }} adicionada{{ done|pluralize }}.</p>
+{% if bad %}<p>Não entraram: {% for n in bad %}Linha {{ n }}{% if not forloop.last %}, {% endif %}{% endfor %}. Confira se cada uma tem um link começando com http.</p>{% endif %}
+{% endif %}
+<p>Uma por linha, no formato <code>Nome: link</code>, <code>Nome | link</code> ou só o link.</p>
+<form method="post" class="form">{% csrf_token %}
+  <textarea name="text" rows="10" aria-label="Trilhas" required>{{ text }}</textarea>
+  <button class="btn" type="submit">Adicionar</button>
+</form>
+<p><a class="btn-link" href="{% url 'record-list' campaign.id rtype.id %}">Voltar à lista</a></p>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Apagar {{ record.name }}{% endblock %}
+{% block content %}
+<h1>Apagar {{ record.name }}?</h1>
+<p>{% if uses %}Este registro é citado ou incorporado em {{ uses }} outro{{ uses|pluralize }}. Os links viram texto riscado.{% else %}Nenhum registro cita este.{% endif %}</p>
+<form method="post">{% csrf_token %}<button class="btn" type="submit">Apagar</button> <a class="btn-link" href="{% url 'record-detail' record.id %}">Cancelar</a></form>
+{% endblock %}
