@@ -79,7 +79,11 @@ export function mentionExtension({ suggestUrl, missing }) {
       const { record, anchor, label } = node.attrs;
       const data = { class: "mention", "data-record": record, "data-anchor": anchor };
       if (missing.has(record)) return ["s", data, label];
-      return ["a", { ...data, href: `/r/${record}/${anchor ? `#${anchor}` : ""}` }, label];
+      return ["a", {
+        ...data,
+        href: `/r/${record}/${anchor ? `?trecho=${anchor}#${anchor}` : ""}`,
+        "data-panel-url": `/r/${record}/painel/${anchor ? `?ancora=${anchor}` : ""}`,
+      }, label];
     },
     renderText({ node }) {
       return node.attrs.label;

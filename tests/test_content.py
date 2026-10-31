@@ -101,7 +101,7 @@ def test_mention_to_deleted_record_is_struck_text():
 
 def test_mention_with_anchor_and_escaping():
     html = render_doc(doc_mention(5, "x", anchor="v"), lambda ids: {5: "<b>"})
-    assert "/r/5/#v" in html and 'data-anchor="v"' in html and "&lt;b&gt;" in html and "<b>" not in html
+    assert "/r/5/?trecho=v#v" in html and 'data-anchor="v"' in html and "&lt;b&gt;" in html and "<b>" not in html
 
 
 def test_resolve_called_once_with_all_ids():

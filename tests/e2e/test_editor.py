@@ -103,9 +103,9 @@ def test_mention_survives_save_and_reload_with_its_attrs(page, live_server, logg
     page.reload()
     link = page.locator(TEXT).locator(".mention")
     expect(link).to_have_text("Elfos › Visão no Escuro")
-    expect(link).to_have_attribute("href", f"/r/{elf.id}/#visao")
+    expect(link).to_have_attribute("href", f"/r/{elf.id}/?trecho=visao#visao")
     link.click()
-    expect(page).to_have_url(re.compile(rf"/r/{elf.id}/#visao$"))
+    expect(page).to_have_url(re.compile(rf"/r/{elf.id}/\?trecho=visao#visao$"))
     expect(page.locator("#visao")).to_be_in_viewport()
 
 

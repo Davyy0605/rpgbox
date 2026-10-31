@@ -65,13 +65,6 @@ function readMissing(element) {
   return new Set((element.dataset.missing ?? "").split(",").filter(Boolean).map(Number));
 }
 
-function openMention(view, pos, event) {
-  const link = event.target.closest?.("a.mention");
-  if (!link) return false;
-  window.location.href = link.href;
-  return true;
-}
-
 export function initEditor(element) {
   if (editors.has(element)) return editors.get(element);
   let contentFailed = false;
@@ -105,7 +98,6 @@ export function initEditor(element) {
     ],
     editorProps: {
       attributes: { role: "textbox", "aria-multiline": "true", "aria-label": element.dataset.label || "Texto" },
-      handleClick: openMention,
       // Espaço para o cursor não ficar sob a barra de formatação.
       scrollMargin: 72,
       scrollThreshold: 72,

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ campaign.name }} · RPGBox{% endblock %}
+{% block crumb %} data-crumb="{{ campaign.name }}" data-crumb-url="{% url 'campaign-home' campaign.id %}"{% endblock %}
+{% block topsearch %}{% endblock %}
 {% block crumbs %}<a href="{% url 'campaign-list' %}">Campanhas</a>{% endblock %}
 {% block content %}
 <div class="head-row">
@@ -8,7 +10,7 @@
 </div>
 <p><a href="{% url 'campaign-export' campaign.id %}">Exportar campanha</a></p>
 <form class="form" role="search" action="{% url 'search' campaign.id %}">
-  <input type="search" name="q" placeholder="Buscar" aria-label="Buscar" autocomplete="off" hx-get="{% url 'search' campaign.id %}" hx-trigger="input changed delay:200ms, search" hx-target="#results" hx-swap="outerHTML">
+  <input type="search" name="q" placeholder="Buscar" aria-label="Buscar" autocomplete="off" data-search-input hx-sync="this:replace" hx-get="{% url 'search' campaign.id %}" hx-trigger="input changed delay:200ms, search" hx-target="#results" hx-swap="outerHTML">
 </form>
 <ul class="list" id="results"></ul>
 <ul class="list">

@@ -2,7 +2,7 @@
   {% if view.missing %}
   <p class="muted">Origem apagada: {{ view.label }}</p>
   {% else %}
-  <a class="embed-origin" href="{% url 'record-detail' view.record.id %}{% if block.embed_anchor %}#{{ block.embed_anchor }}{% endif %}" data-record="{{ view.record.id }}">{{ view.label }}</a>
+  <a class="embed-origin" href="{% url 'record-detail' view.record.id %}{% if block.embed_anchor %}?trecho={{ block.embed_anchor }}#{{ block.embed_anchor }}{% endif %}" data-record="{{ view.record.id }}">{{ view.label }}</a>
   <div class="embed-body">{{ view.html }}</div>
   {% endif %}
   <form method="post" action="{% url 'block-delete' block.id %}">{% csrf_token %}<button class="btn-link" type="submit">Remover bloco</button></form>

@@ -8,11 +8,12 @@
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'js/app.js' %}" defer></script>
 </head>
-<body>
+{% firstof campaign.id record.campaign_id as campaign_id %}<body{% if campaign_id %} data-campaign="{{ campaign_id }}"{% endif %}>
   <header class="topbar">
     <a class="brand" href="/">RPGBox</a>
-    <nav class="crumbs" aria-label="Navegação">{% block crumbs %}{% endblock %}</nav>
+    <nav class="crumbs" aria-label="Navegação" data-trail>{% block crumbs %}{% endblock %}</nav>
+    {% block topsearch %}{% if campaign_id %}{% include "indexing/_topsearch.html" %}{% endif %}{% endblock %}
   </header>
-  <main class="page">{% block content %}{% endblock %}</main>
+  <main class="page"{% block crumb %}{% endblock %}>{% block content %}{% endblock %}</main>
 </body>
 </html>

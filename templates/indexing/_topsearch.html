@@ -1,0 +1,9 @@
+<div class="topsearch" data-topsearch>
+  <button class="search-toggle" type="button" aria-label="Buscar" aria-expanded="false" data-search-toggle>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+  </button>
+  <form class="search-form" role="search" action="{% url 'search' campaign_id %}">
+    <input type="search" name="q" placeholder="Buscar na campanha" aria-label="Buscar na campanha" autocomplete="off" data-search-input hx-get="{% url 'search' campaign_id %}" hx-trigger="input changed delay:200ms, search" hx-target="#results" hx-swap="outerHTML" hx-sync="this:replace">
+    <ul class="list" id="results"></ul>
+  </form>
+</div>

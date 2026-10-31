@@ -1,6 +1,10 @@
 import { attachAutosave, attachFieldAutosave, draftKey } from "./autosave.js";
 import { destroyDetachedEditors, initEditor, isUnreadable } from "./editor.js";
 import { initPicker } from "./picker.js";
+import { initCopy } from "./copy.js";
+import { initSearch } from "./search.js";
+import { initSheet } from "./sheet.js";
+import { initTrail } from "./trail.js";
 import { initUpload } from "./upload.js";
 
 const started = new WeakSet();
@@ -49,6 +53,10 @@ function scrollToAnchor() {
 function start() {
   activate(document.body);
   scrollToAnchor();
+  initCopy();
+  initSearch();
+  initTrail();
+  initSheet();
   document.body.addEventListener("htmx:afterSwap", (event) => {
     destroyDetachedEditors();
     activate(event.detail.target);
