@@ -1,0 +1,8 @@
+.superpowers/
+.venv/
+.env
+node_modules/
+media/
+__pycache__/
+*.pyc
+db.sqlite3
