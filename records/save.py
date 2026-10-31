@@ -59,6 +59,8 @@ def _check_kind(kind, value):
 
 
 def save_field(record, key, value, base_version) -> SaveResult:
+    if not clean_text(key):  # NUL ou substituto solto derrubaria a consulta (500)
+        raise ValidationError("Campo inexistente.")
     with transaction.atomic():
         locked = Record.objects.select_for_update().select_related("record_type").get(pk=record.pk)
         fdef = locked.record_type.fielddef_set.filter(key=key).first()

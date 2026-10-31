@@ -173,3 +173,12 @@ def test_create_type_from_home(client, user, campaign):
     t = campaign.recordtype_set.get(name="Raças")
     assert r.url == f"/c/{campaign.id}/t/{t.id}/"
     assert client.post(f"/c/{campaign.id}/tipos/novo/", {"name": "Raças"}).status_code == 200
+
+
+def test_field_key_with_nul_or_lone_surrogate_is_400_not_500(client, user, make_campaign):
+    from tests.test_indexing import make_record
+    record = make_record(make_campaign(user), "Personagens", "Kael")
+    client.force_login(user)
+    for key in ("\x00", "\ud800"):
+        r = client.post(f"/r/{record.id}/campos/", {"key": key, "version": 1, "value": "x"}, content_type="application/json")
+        assert r.status_code == 400
