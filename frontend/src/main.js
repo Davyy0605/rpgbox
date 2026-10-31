@@ -1,6 +1,7 @@
 import { attachAutosave, attachFieldAutosave, draftKey } from "./autosave.js";
 import { destroyDetachedEditors, initEditor, isUnreadable } from "./editor.js";
 import { initPicker } from "./picker.js";
+import { initUpload } from "./upload.js";
 
 const started = new WeakSet();
 
@@ -36,6 +37,7 @@ function activate(root) {
     attachFieldAutosave(input);
   }
   within(root, "[data-embed-picker]").forEach(initPicker);
+  within(root, "[data-dropzone]").forEach(initUpload);
 }
 
 function scrollToAnchor() {
