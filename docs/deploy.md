@@ -17,7 +17,7 @@ O arquivo `.env.example` na raiz do projeto lista todas as variáveis, sem valor
 ## 1. Criar o banco no Neon
 
 1. Entre em https://neon.tech e crie a conta.
-2. Crie um projeto (o nome pode ser `rpgbox`). Escolha a região mais próxima do Brasil disponível (por exemplo, São Paulo, se houver; senão, a região dos EUA mais ao leste).
+2. Crie um projeto (o nome pode ser `rpgbox`). Escolha a região **AWS US East 1 (N. Virginia)**, a mesma do Render no `render.yaml`. Banco e site em regiões diferentes deixam cada ação segundos mais lenta, mesmo com o banco perto de você. A região não muda depois de criada.
 3. Na tela do projeto, clique em **Connect** e copie a **connection string** (começa com `postgresql://`). Ela deve terminar com `?sslmode=require`.
 4. Guarde esse texto: é o `DATABASE_URL`. Trate como senha.
 
