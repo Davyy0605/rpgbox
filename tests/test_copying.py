@@ -140,3 +140,54 @@ def test_copy_to_other_masters_campaign_404(client, user, character, foreign_cam
 def test_copy_to_same_campaign_404(client, user, character, campaign):
     client.force_login(user)
     assert client.post(f"/r/{character.id}/copiar/", {"campaign": campaign.id}).status_code == 404
+
+
+def test_copy_same_label_fields_keep_both_values(character, other_campaign_same_owner):
+    a = FieldDef.objects.create(record_type=character.record_type, label="Lema", kind="short")
+    b = FieldDef.objects.create(record_type=character.record_type, label="Lema", kind="short")
+    character.fields = {a.key: "um", b.key: "dois"}
+    character.save()
+    c = copy_record(character, other_campaign_same_owner)
+    assert sorted(c.fields.values()) == ["dois", "um"]
+    c2 = copy_record(character, other_campaign_same_owner)
+    assert sorted(c2.fields.values()) == ["dois", "um"]
+
+
+def test_copy_same_label_other_kind_gets_new_field(character, other_campaign_same_owner):
+    dest_type = other_campaign_same_owner.recordtype_set.get(name="Personagens")
+    FieldDef.objects.create(record_type=dest_type, label="Lema", kind="number")
+    f = FieldDef.objects.create(record_type=character.record_type, label="Lema", kind="short")
+    character.fields = {f.key: "texto"}
+    character.save()
+    c = copy_record(character, other_campaign_same_owner)
+    nf = dest_type.fielddef_set.get(label="Lema", kind="short")
+    assert c.fields == {nf.key: "texto"} and dest_type.fielddef_set.filter(label="Lema").count() == 2
+
+
+def test_copy_failure_leaves_nothing_and_removes_files(record_with_image, other_campaign_same_owner, user, monkeypatch):
+    from campaigns.models import RecordType
+    from records.models import Record, Tab
+
+    key = default_storage.save("1/y.webp", ContentFile(b"img2"))
+    tkey = default_storage.save("1/y_t.webp", ContentFile(b"th2"))
+    Asset.objects.create(owner=user, record=record_with_image, kind="image", filename="y.webp", key=key,
+                         thumb_key=tkey, content_type="image/webp", size=4)
+    real_save, saved = default_storage.save, []
+
+    def flaky(name, content, *a, **kw):
+        if len(saved) == 3:
+            raise OSError("falha")
+        k = real_save(name, content, *a, **kw)
+        saved.append(k)
+        return k
+
+    monkeypatch.setattr(default_storage, "save", flaky)
+    types_before = RecordType.objects.filter(campaign=other_campaign_same_owner).count()
+    with pytest.raises(OSError):
+        copy_record(record_with_image, other_campaign_same_owner)
+    assert len(saved) == 3
+    assert not any(default_storage.exists(k) for k in saved)
+    assert not Record.objects.filter(campaign=other_campaign_same_owner).exists()
+    assert not Tab.objects.filter(record__campaign=other_campaign_same_owner).exists()
+    assert Asset.objects.count() == 2
+    assert RecordType.objects.filter(campaign=other_campaign_same_owner).count() == types_before

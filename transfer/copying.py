@@ -70,13 +70,14 @@ def _dest_type(source_type, dest):
 def _field_map(source_type, dest_type):
     """key de origem -> key no destino, ligando por rótulo; sem par, cria o campo."""
     dest_fields = list(dest_type.fielddef_set.order_by("removed", "position", "id"))
-    mapping = {}
+    mapping, used = {}, set()
     for f in source_type.fielddef_set.order_by("position", "id"):
-        match = next((d for d in dest_fields if d.label == f.label), None)
+        match = next((d for d in dest_fields if d.id not in used and d.label == f.label and d.kind == f.kind), None)
         if match is None:
             match = FieldDef.objects.create(record_type=dest_type, label=f.label, kind=f.kind,
                                             position=len(dest_fields), removed=f.removed)
             dest_fields.append(match)
+        used.add(match.id)
         mapping[f.key] = match.key
     return mapping
 
