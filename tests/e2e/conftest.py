@@ -1,13 +1,29 @@
 import os
+import threading
 
 import pytest
 from django.conf import settings
+from django.core.handlers.wsgi import WSGIHandler
 
 from ..test_indexing import make_record
 
 # A API síncrona do Playwright mantém um laço de eventos na thread dos testes,
 # e o Django recusaria o ORM ali sem isto.
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+
+# O live_server tem uma thread por pedido, mas todas dividem a conexão do SQLite em memória.
+# Um envio ao sair da página e o GET da página seguinte chegam juntos, e sem a fila dá
+# "database table is locked". Com Postgres isso não acontece.
+_one_request_at_a_time = threading.RLock()
+_wsgi_call = WSGIHandler.__call__
+
+
+def _queued_call(self, environ, start_response):
+    with _one_request_at_a_time:
+        return _wsgi_call(self, environ, start_response)
+
+
+WSGIHandler.__call__ = _queued_call
 
 
 @pytest.fixture(scope="session")

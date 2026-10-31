@@ -320,6 +320,308 @@ def test_leaving_the_page_with_a_big_text_still_sends(page, live_server, logged_
     expect(page.get_by_text("Sem conexão")).to_have_count(0)
 
 
+def watch_keepalive(page):
+    """Anota como foi o último envio. A navegação é de verdade: nada aqui finge a visibilidade."""
+    page.add_init_script("""
+        const realFetch = window.fetch;
+        window.fetch = (url, options) => {
+            if (options?.method === "POST") sessionStorage.setItem("keepalive", String(options.keepalive));
+            return realFetch(url, options);
+        };
+    """)
+
+
+def sent_with_keepalive(page):
+    return page.evaluate("sessionStorage.getItem('keepalive')") == "true"
+
+
+def server_has(page, read, wanted):
+    """Espera o servidor receber o texto; a página que o enviou já foi embora."""
+    for _ in range(50):
+        if read_db(page, read) == wanted:
+            return True
+        page.wait_for_timeout(100)
+    return False
+
+
+def test_following_a_link_right_after_typing_reaches_the_server(page, live_server, logged_in, character, text_block):
+    watch_keepalive(page)
+    stop_the_clock(page, url_of(character))  # o relógio parado segura o envio de 800 ms: só resta o da saída
+    type_at_end(page, " antes de sair")
+    page.locator("a.brand").click()
+    page.wait_for_url("**/")
+    assert server_has(page, lambda: texts(block_of(character)), ["texto antes de sair"])
+    assert sent_with_keepalive(page)
+
+
+def test_reloading_right_after_typing_reaches_the_server(page, live_server, logged_in, character, text_block):
+    # Sem rascunho na volta: quem salva é o envio feito ao sair, e não o reenvio ao abrir.
+    watch_keepalive(page)
+    stop_the_clock(page, url_of(character))
+    page.add_init_script("""Object.keys(localStorage).forEach(k => localStorage.removeItem(k));""")
+    type_at_end(page, " antes de recarregar")
+    page.reload()
+    assert server_has(page, lambda: texts(block_of(character)), ["texto antes de recarregar"])
+    assert sent_with_keepalive(page)
+
+
+def test_leaving_right_after_typing_in_a_field_reaches_the_server(page, live_server, logged_in, character):
+    key = field_key(character, "Ocupação")
+    watch_keepalive(page)
+    stop_the_clock(page, url_of(character))
+    page.get_by_label("Ocupação").fill("Bardo")
+    page.locator("a.brand").click()
+    page.wait_for_url("**/")
+
+    def read():
+        character.refresh_from_db()
+        return character.fields.get(key)
+
+    assert server_has(page, read, "Bardo")
+    assert sent_with_keepalive(page)
+
+
+def test_leaving_during_a_send_sends_again_with_keepalive(page, live_server, logged_in, character, text_block):
+    held = []
+
+    def hold_first(route):
+        if held:
+            route.continue_()
+        else:
+            held.append(route)
+
+    page.route(BLOCK_SAVE, hold_first)
+    watch_keepalive(page)
+    page.goto(url_of(character))
+    type_at_end(page, " em andamento")
+    page.wait_for_timeout(1200)
+    assert len(held) == 1
+    page.locator("a.brand").click()
+    page.wait_for_url("**/")
+    assert server_has(page, lambda: texts(block_of(character)), ["texto em andamento"])
+    assert sent_with_keepalive(page)
+
+
+# Duas abas
+
+def test_second_tab_does_not_eat_the_draft_of_the_first(page, context, live_server, logged_in, character, text_block):
+    # A primeira aba fica sem rede e é fechada; a segunda salva por cima do mesmo texto.
+    second = context.new_page()
+    second.goto(url_of(character))
+    page.goto(url_of(character))
+    context.set_offline(True)
+    type_at_end(page, " aaaa")
+    expect(page.get_by_text("Sem conexão")).to_be_visible(timeout=RETRIED)
+    page.close()
+    context.set_offline(False)
+
+    saved(second, lambda: type_at_end(second, " bbbb"), "bbbb")
+    assert texts(block_of(character)) == ["texto bbbb"]
+    expect(second.get_by_text(CONFLICT)).to_have_count(0)
+
+    second.reload()
+    expect(second.get_by_text(CONFLICT)).to_be_visible()
+    expect(second.get_by_role("group", name=MINE)).to_contain_text("aaaa")
+    expect(second.get_by_role("group", name=THEIRS)).to_contain_text("bbbb")
+
+
+def test_answer_in_one_tab_does_not_delete_the_newer_draft_of_the_other(page, context, live_server, logged_in,
+                                                                        character, text_block):
+    held = []
+
+    def hold_a(route):
+        if "texto b" in (route.request.post_data or ""):
+            route.abort()
+        elif held:
+            route.continue_()
+        else:
+            held.append(route)
+
+    context.route(BLOCK_SAVE, hold_a)
+    second = context.new_page()
+    second.goto(url_of(character))
+    page.goto(url_of(character))
+    type_at_end(page, " aaaa")
+    page.wait_for_timeout(1000)
+    assert held
+    type_at_end(second, " bbbb")
+    expect(second.get_by_text("Sem conexão")).to_be_visible(timeout=RETRIED)
+    held[0].continue_()
+    expect(page.get_by_text("Salvo")).to_be_visible()
+
+    stored = second.evaluate("""() => Object.keys(localStorage).filter(k => k.startsWith("rascunho:"))
+        .map(k => localStorage.getItem(k))""")
+    assert len(stored) == 1 and "bbbb" in stored[0]
+    context.unroute(BLOCK_SAVE)
+    second.reload()
+    expect(second.get_by_text(CONFLICT)).to_be_visible()
+    expect(second.get_by_role("group", name=MINE)).to_contain_text("bbbb")
+
+
+def test_tab_draft_is_not_dropped_unread_when_a_block_draft_comes_first(page, live_server, logged_in, character,
+                                                                        text_block):
+    tab_key = f"rascunho:/abas/{text_block.tab_id}/blocos/"
+    seed_draft(page, block_key(text_block), doc("do bloco"), 1)
+    page.evaluate("([k, d]) => localStorage.setItem(k, JSON.stringify(d))",
+                  [tab_key, {"value": doc("da aba"), "version": None}])
+    with page.expect_response(BLOCK_SAVE):
+        page.goto(url_of(character))
+    expect(page.get_by_text("Salvo")).to_be_visible()
+    assert draft(page, tab_key) is not None
+    page.reload()
+    expect(page.get_by_text(CONFLICT)).to_be_visible()
+    expect(page.get_by_role("group", name=MINE)).to_contain_text("da aba")
+    expect(page.get_by_role("group", name=THEIRS)).to_contain_text("do bloco")
+
+
+def test_two_tabs_on_an_empty_tab_keep_both_drafts(page, context, live_server, logged_in, campaign):
+    empty = make_record(campaign, "Personagens", "Dorn")
+    context.route(BLOCK_CREATE, lambda route: route.abort())
+    second = context.new_page()
+    second.goto(url_of(empty))
+    page.goto(url_of(empty))
+    page.locator(TEXT).click(); page.keyboard.type("de A")
+    second.locator(TEXT).click(); second.keyboard.type("de B")
+    expect(second.get_by_text("Sem conexão")).to_be_visible(timeout=RETRIED)
+    stored = second.evaluate("""() => Object.keys(localStorage).filter(k => k.startsWith("rascunho:"))
+        .map(k => localStorage.getItem(k)).join()""")
+    assert "de A" in stored and "de B" in stored
+
+
+# Aparelho sem espaço para o rascunho
+
+AT_RISK = "não conseguiu guardar"
+
+
+def fill_storage(page, prefix="rascunho:"):
+    page.add_init_script("""(prefix => {
+        const real = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) {
+            if (location.pathname !== "/health" && key.startsWith(prefix)) {
+                throw new DOMException("cheio", "QuotaExceededError");
+            }
+            real.call(this, key, value);
+        };
+    })(%s);""" % json.dumps(prefix))
+
+
+def status_with(page, text):
+    return page.locator(".save-status", has_text=text)
+
+
+def test_full_storage_warns_while_offline(page, context, live_server, logged_in, character, text_block):
+    fill_storage(page)
+    page.goto(url_of(character))
+    context.set_offline(True)
+    type_at_end(page, " x")
+    expect(status_with(page, "Sem conexão")).to_contain_text(AT_RISK, timeout=RETRIED)
+    context.set_offline(False)
+
+
+def test_full_storage_never_promises_the_text_is_on_the_device(page, live_server, logged_in, character, text_block):
+    fill_storage(page)
+    page.route(BLOCK_SAVE, lambda route: route.fulfill(
+        status=400, content_type="application/json", body='{"error": "Documento inválido."}'))
+    page.goto(url_of(character))
+    type_at_end(page, " x")
+    message = status_with(page, "Não foi possível salvar")
+    expect(message).to_contain_text(AT_RISK)
+    expect(message).not_to_contain_text("segue neste aparelho")
+
+
+def test_full_storage_warning_goes_away_once_saved(page, live_server, logged_in, character, text_block):
+    fill_storage(page)
+    page.goto(url_of(character))
+    saved(page, lambda: type_at_end(page, " x"), "texto x")
+    expect(page.get_by_text("Salvo")).to_be_visible()
+    expect(status_with(page, AT_RISK)).to_have_count(0)
+
+
+def test_session_warning_does_not_promise_the_device_when_storage_is_full(page, context, live_server, logged_in,
+                                                                          character, text_block):
+    fill_storage(page)
+    page.goto(url_of(character))
+    context.clear_cookies(name="sessionid")
+    type_at_end(page, " x")
+    message = status_with(page, "Sessão expirada")
+    expect(message).to_contain_text(AT_RISK)
+    expect(message).not_to_contain_text("segue neste aparelho")
+
+
+def test_tab_draft_stays_when_the_block_draft_cannot_be_written(page, live_server, logged_in, campaign):
+    empty = make_record(campaign, "Personagens", "Dorn")
+    tab_key = f"rascunho:/abas/{empty.tab_set.order_by('position', 'id').first().id}/blocos/"
+    fill_storage(page, "rascunho:/blocos/")
+    held = []
+    page.route(BLOCK_SAVE, lambda route: held.append(route))
+    page.goto(url_of(empty))
+    page.locator(TEXT).click(); page.keyboard.type("oi")
+    page.wait_for_timeout(1200)
+    assert held
+    assert draft(page, tab_key)["value"] == doc("oi")
+    expect(status_with(page, "Salvando")).to_contain_text(AT_RISK)
+
+
+def test_recovered_tab_draft_stays_until_the_new_one_is_written(page, live_server, logged_in, campaign):
+    empty = make_record(campaign, "Personagens", "Dorn")
+    tab = empty.tab_set.order_by("position", "id").first()
+    Block.objects.create(tab=tab, kind="text", content={"type": "doc", "content": []})
+    fill_storage(page, "rascunho:/blocos/")
+    seed_draft(page, f"rascunho:/abas/{tab.id}/blocos/", doc("quase perdi"), None)
+    held = []
+    page.route(BLOCK_SAVE, lambda route: held.append(route))
+    page.goto(url_of(empty))
+    expect(page.locator(TEXT)).to_have_text("quase perdi")
+    page.wait_for_timeout(300)
+    assert held
+    assert draft(page, f"rascunho:/abas/{tab.id}/blocos/")["value"] == doc("quase perdi")
+
+
+def test_conflict_choice_keeps_the_old_draft_until_the_new_one_is_written(page, live_server, logged_in, campaign):
+    empty = make_record(campaign, "Personagens", "Dorn")
+    tab = empty.tab_set.order_by("position", "id").first()
+    Block.objects.create(tab=tab, kind="text", content=doc("do pc"), version=2)
+    fill_storage(page, "rascunho:/blocos/")
+    seed_draft(page, f"rascunho:/abas/{tab.id}/blocos/", doc("do celular"), None)
+    held = []
+    page.route(BLOCK_SAVE, lambda route: held.append(route))
+    page.goto(url_of(empty))
+    use(page, MINE)
+    page.wait_for_timeout(300)
+    assert held
+    assert draft(page, f"rascunho:/abas/{tab.id}/blocos/")["value"] == doc("do celular")
+
+
+def test_retrying_one_text_does_not_forget_the_older_send_that_arrived(page, live_server, logged_in, character,
+                                                                       text_block):
+    seen = []
+
+    def handler(route):
+        seen.append(1)
+        if len(seen) == 1:
+            route.fetch()
+            route.abort()
+        elif len(seen) <= 8:
+            route.abort()
+        else:
+            route.continue_()
+
+    page.route(BLOCK_SAVE, handler)
+    stop_the_clock(page, url_of(character))
+    type_at_end(page, " um")
+    page.clock.run_for(800)
+    expect(page.get_by_text("Sem conexão")).to_be_visible(timeout=RETRIED)
+    page.keyboard.type(" dois")
+    page.clock.run_for(800)
+    page.wait_for_timeout(200)
+    for _ in range(8):
+        page.clock.run_for(30000)
+        page.wait_for_timeout(200)
+    expect(page.get_by_text("Salvo")).to_be_visible(timeout=RETRIED)
+    expect(page.get_by_text(CONFLICT)).to_have_count(0)
+    assert texts(block_of(character)) == ["texto um dois"]
+
+
 # Conflito
 
 def test_conflict_shows_both_versions(page, live_server, logged_in, text_block, text_block_url):

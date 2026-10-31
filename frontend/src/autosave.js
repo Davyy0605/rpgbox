@@ -14,9 +14,11 @@ const REMEMBERED_SENDS = 5;
 const SAVING = "Salvando";
 const SAVED = "Salvo";
 const OFFLINE = "Sem conexão, tentando de novo";
-const SESSION = "Sessão expirada. Entre de novo para salvar; o texto segue neste aparelho.";
-const GONE = "Este texto não existe mais no servidor. Copie o que precisar; ele segue neste aparelho.";
+const SESSION = "Sessão expirada. Entre de novo para salvar.";
+const GONE = "Este texto não existe mais no servidor. Copie o que precisar.";
 const REFUSED = "O servidor recusou o envio.";
+const KEPT = "O texto segue neste aparelho.";
+const AT_RISK = "Este aparelho não conseguiu guardar o texto: não feche a página antes de salvar.";
 
 const EMPTY = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -33,11 +35,13 @@ function readDraft(key) {
   }
 }
 
-function writeDraft(key, value, version) {
+// false: sem espaço ou bloqueado. O texto segue na memória e continua sendo enviado, mas só ali.
+function writeDraft(key, draft) {
   try {
-    localStorage.setItem(key, JSON.stringify({ value, version }));
+    localStorage.setItem(key, JSON.stringify(draft));
+    return true;
   } catch {
-    // Sem espaço ou bloqueado: o texto segue na memória e continua sendo enviado.
+    return false;
   }
 }
 
@@ -49,16 +53,25 @@ function dropDraft(key) {
   }
 }
 
+// A chave principal e as de outras abas, que recebem um sufixo quando ela já tem dono.
+function draftKeys(base) {
+  try {
+    return Object.keys(localStorage).filter((key) => key === base || key.startsWith(`${base}#`)).sort();
+  } catch {
+    return [];
+  }
+}
+
 function csrfToken() {
   return document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/)?.[1] ?? "";
 }
 
-async function request(url, body) {
+async function request(url, body, leaving) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT);
   const text = JSON.stringify(body);
   // Com a página sumindo, só keepalive termina; o rascunho cobre o texto grande demais para ele.
-  const keepalive = document.visibilityState === "hidden" && new Blob([text]).size < KEEPALIVE_LIMIT;
+  const keepalive = leaving && new Blob([text]).size < KEEPALIVE_LIMIT;
   try {
     const response = await fetch(url, {
       method: "POST",
@@ -79,7 +92,13 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
   let url = saveUrl;
   let version = startVersion ?? null;
   let key = startKey;
-  let orphanKey = startOrphan;
+  const orphanKey = startOrphan;
+  // Cada aba só apaga ou sobrescreve o rascunho que é seu.
+  const owner = Math.random().toString(36).slice(2);
+  let slot = null;
+  let unstored = false;
+  let message = "";
+  let warned = false;
   let value = null;
   let seq = 0;
   let savedSeq = 0;
@@ -98,8 +117,12 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
   element.after(status);
 
   function show(text, warn = false) {
-    status.textContent = text;
-    status.classList.toggle("warn", warn);
+    message = text;
+    warned = warn;
+    const atRisk = unstored && text && text !== SAVED;
+    const note = atRisk ? AT_RISK : warn ? KEPT : "";
+    status.textContent = note ? `${text.replace(/\.?$/, ".")} ${note}` : text;
+    status.classList.toggle("warn", warn || Boolean(atRisk));
     status.hidden = !text;
   }
 
@@ -108,9 +131,23 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
     timer = setTimeout(send, ms);
   }
 
-  function clearDrafts() {
-    dropDraft(key);
-    if (orphanKey) dropDraft(orphanKey);
+  function dropOwnDraft() {
+    if (slot && readDraft(slot)?.owner === owner) dropDraft(slot);
+    slot = null;
+  }
+
+  // O rascunho antigo só sai depois que o novo foi gravado, e o de outra aba fica onde está.
+  function persist() {
+    const holder = readDraft(key);
+    const suffixed = `${key}#${owner}`;
+    const target = slot === suffixed || (holder && holder.owner !== owner) ? suffixed : key;
+    unstored = !writeDraft(target, { value, version, owner });
+    if (unstored) {
+      show(message, warned);
+    } else {
+      if (slot !== target) dropOwnDraft();
+      slot = target;
+    }
   }
 
   function retry(text, warn) {
@@ -123,8 +160,9 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
     value = next;
     seq += 1;
     halted = false;
-    writeDraft(key, value, version);
-    if (!attempts) show(SAVING);
+    persist();
+    if (attempts) show(message, warned);
+    else show(SAVING);
     schedule(DELAY);
   }
 
@@ -135,11 +173,12 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
     unconfirmed = [];
     element.dataset.version = version;
     if (seq === savedSeq) {
-      clearDrafts();
+      dropOwnDraft();
+      unstored = false;
       show(SAVED);
     } else {
       // O que foi escrito durante o envio parte da versão nova, inclusive no rascunho.
-      writeDraft(key, value, version);
+      persist();
       schedule(DELAY);
     }
   }
@@ -147,7 +186,7 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
   function closeConflict(panel, chosen, serverVersion, isServer) {
     if (isServer && !field.accepts(chosen)) {
       // O editor não abre a versão do servidor: abandonar a daqui é recarregar e vê-la como somente leitura.
-      clearDrafts();
+      dropOwnDraft();
       window.location.reload();
       return;
     }
@@ -160,7 +199,6 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
     unconfirmed = [];
     element.dataset.version = version;
     changed(field.read());
-    if (orphanKey) dropDraft(orphanKey);
     send();
   }
 
@@ -217,30 +255,30 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
 
   function bindBlock(data) {
     const existing = "content" in data && !field.blank(data.content);
-    const previous = key;
     url = data.save_url;
     version = data.version;
     key = draftKey(url);
     element.dataset.saveUrl = url;
     element.dataset.version = version;
     delete element.dataset.createUrl;
-    if (existing) {
-      // Sem versão de base até a escolha: fica onde um recarregamento volta a tratá-lo como conflito.
-      orphanKey = previous;
-    } else {
-      writeDraft(key, value, version);
-      dropDraft(previous);
-    }
+    // Com texto no bloco, o rascunho fica na chave da aba: recarregar volta a tratá-lo como conflito.
+    if (!existing) persist();
     return existing;
   }
 
-  async function deliver(sent) {
+  async function deliver(sent, leaving) {
     if (!url) {
-      const created = await request(createUrl, { first: true });
+      const created = await request(createUrl, { first: true }, leaving);
       if (created.status !== 200 || typeof created.data?.save_url !== "string") return created;
       if (bindBlock(created.data)) return { status: 409, data: created.data };
     }
-    return request(url, field.body(sent, version));
+    return request(url, field.body(sent, version), leaving);
+  }
+
+  function rememberUnconfirmed(sent) {
+    const last = unconfirmed[unconfirmed.length - 1];
+    // Repetir o mesmo texto não pode empurrar para fora um envio mais antigo que talvez tenha chegado.
+    if (last === undefined || !field.same(last, sent)) unconfirmed = [...unconfirmed, sent].slice(-REMEMBERED_SENDS);
   }
 
   function settle(result, sent, sentSeq) {
@@ -252,7 +290,7 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
     } else if (!result || result.status >= 500 || [408, 425, 429].includes(result.status)
       || ((result.status === 200 || result.status === 409) && !hasVersion)) {
       // Inclui a página de espera de quem hospeda o site, que também pode vir como 200.
-      unconfirmed = [...unconfirmed, sent].slice(-REMEMBERED_SENDS);
+      rememberUnconfirmed(sent);
       retry(OFFLINE);
     } else if (result.status === 200) {
       confirmed(data.version, sentSeq);
@@ -263,41 +301,37 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
       schedule(DELAY);
     } else {
       halted = true;
-      show(result.status === 404 ? GONE : `Não foi possível salvar. ${data?.error ?? REFUSED} O texto segue neste aparelho.`, true);
+      show(result.status === 404 ? GONE : `Não foi possível salvar. ${data?.error ?? REFUSED}`, true);
     }
   }
 
-  async function send() {
+  // `ending`: a página acabou. Um envio em andamento morre com ela, então este vai mesmo assim.
+  async function send(leaving = false, ending = false) {
     clearTimeout(timer);
-    if (sending || inConflict || seq === savedSeq) return;
+    if ((sending && !ending) || inConflict || seq === savedSeq) return;
     sending = true;
     const sent = value;
     const sentSeq = seq;
     if (!attempts) show(SAVING);
-    const result = await deliver(sent).catch(() => null);
+    const result = await deliver(sent, leaving).catch(() => null);
     sending = false;
     settle(result, sent, sentSeq);
   }
 
-  function sendNow() {
-    if (!halted) send();
+  // O Chromium dispara pagehide com a página ainda "visible".
+  function onLeave(event) {
+    if (halted) return;
+    const ending = event.type === "pagehide";
+    send(ending || document.visibilityState === "hidden", ending);
   }
 
-  function restore() {
-    let draft = readDraft(key);
-    let orphan = false;
-    if (!draft && orphanKey) {
-      draft = readDraft(orphanKey);
-      orphan = Boolean(draft);
-    }
-    if (!draft || !field.accepts(draft.value)) return;
-    const server = field.read();
-    if (field.same(draft.value, server)) {
-      clearDrafts();
-    } else if (orphan ? field.blank(server) : draft.version === version) {
+  function takeDraft(stored, draft, server) {
+    const orphan = Boolean(orphanKey) && stored.startsWith(orphanKey);
+    writeDraft(stored, { ...draft, owner });
+    slot = stored;
+    if (orphan ? field.blank(server) : draft.version === version) {
       field.write(draft.value);
       changed(field.read());
-      if (orphan) dropDraft(orphanKey);
       send();
     } else {
       value = draft.value;
@@ -306,8 +340,23 @@ function startSaver(field, { element, saveUrl, createUrl, version: startVersion,
     }
   }
 
-  document.addEventListener("visibilitychange", sendNow);
-  window.addEventListener("pagehide", sendNow);
+  // Um rascunho por vez: os outros seguem guardados e aparecem ao abrir de novo.
+  function restore() {
+    const server = field.read();
+    for (const stored of [...draftKeys(key), ...(orphanKey ? draftKeys(orphanKey) : [])]) {
+      const draft = readDraft(stored);
+      if (draft && field.accepts(draft.value)) {
+        if (!field.same(draft.value, server)) {
+          takeDraft(stored, draft, server);
+          return;
+        }
+        dropDraft(stored);
+      }
+    }
+  }
+
+  document.addEventListener("visibilitychange", onLeave);
+  window.addEventListener("pagehide", onLeave);
   // Com folga: a rede que acabou de voltar ainda oscila.
   window.addEventListener("online", () => {
     if (!halted && seq !== savedSeq) schedule(DELAY);
