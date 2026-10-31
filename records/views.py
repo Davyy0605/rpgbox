@@ -39,6 +39,7 @@ def record_list(request, campaign_id, type_id):
     return render(request, "records/list.html", {
         "campaign": campaign, "rtype": rtype, "records": records, "groups": groups,
         "current_group": current, "gallery": request.GET.get("v") == "galeria",
+        "has_link": rtype.fielddef_set.filter(kind="link", removed=False).exists(),
     })
 
 

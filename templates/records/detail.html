@@ -21,6 +21,7 @@
     <input name="name" value="{{ record.name }}" maxlength="160" aria-label="Novo nome" required>
     <button class="btn" type="submit">Renomear</button>
   </form>
+  <a class="btn-link" href="{% url 'record-copy' record.id %}">Copiar para outra campanha</a>
   <a class="btn-link" href="{% url 'record-delete' record.id %}">Apagar registro</a>
 </details>
 {% if citations %}

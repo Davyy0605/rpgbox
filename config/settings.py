@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "records",
     "indexing",
     "assets",
+    "transfer",
 ]
 
 MIDDLEWARE = [
