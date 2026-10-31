@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
-from content.doc import valid_anchor, validate_doc
+from content.doc import clean_text, valid_anchor, validate_doc
 from content.render import render_doc
 from indexing.services import citations, reindex_record, resolver_for
 
@@ -57,19 +57,20 @@ def save_field(record, key, value, base_version) -> SaveResult:
             raise ValidationError("Campo inexistente.")
         if fdef.kind == "long" and isinstance(value, dict):
             value = validate_doc(value)
-        elif isinstance(value, str) and len(value) <= MAX_VALUE:
+        elif isinstance(value, str) and len(value) <= MAX_VALUE and clean_text(value):
             pass
         else:
             raise ValidationError("Valor inválido.")
         current = locked.fields.get(key, "")
-        if locked.version != base_version:
-            return SaveResult(False, locked.version, current)
+        server_version = locked.field_versions.get(key, 1)
+        if server_version != base_version:
+            return SaveResult(False, server_version, current)
         locked.fields = {**locked.fields, key: value}
-        locked.version += 1
-        locked.save(update_fields=["fields", "version", "updated_at"])
+        locked.field_versions = {**locked.field_versions, key: server_version + 1}
+        locked.save(update_fields=["fields", "field_versions", "updated_at"])
         reindex_record(locked)
-    record.fields, record.version = locked.fields, locked.version
-    return SaveResult(True, locked.version, value)
+    record.fields, record.field_versions = locked.fields, locked.field_versions
+    return SaveResult(True, server_version + 1, value)
 
 
 def add_text_block(tab) -> Block:
@@ -105,6 +106,7 @@ def rename_record(record, name) -> None:
     with transaction.atomic():
         record.name = name
         record.save(update_fields=["name", "updated_at"])
+        Block.objects.filter(embed_record=record).update(embed_label=name[:160])
         reindex_record(record)
 
 

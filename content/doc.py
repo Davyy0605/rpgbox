@@ -32,6 +32,17 @@ def valid_anchor(anchor) -> bool:
     return isinstance(anchor, str) and ANCHOR_RE.fullmatch(anchor) is not None
 
 
+def clean_text(value) -> bool:
+    """False se a string tem NUL ou substitutos soltos (não cabem em JSON/UTF-8 do banco)."""
+    if "\x00" in value:
+        return False
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def is_int(value) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -45,7 +56,7 @@ def _mark(mark):
         _fail("Marca não permitida.")
     if mark["type"] == "link":
         href = (mark.get("attrs") or {}).get("href")
-        if not safe_href(href):
+        if not safe_href(href) or not clean_text(href):
             _fail("Endereço de link não permitido.")
         return {"type": "link", "attrs": {"href": href}}
     return {"type": mark["type"]}
@@ -63,6 +74,8 @@ def _node(node, depth):
     out = {"type": kind}
     if kind == "text":
         if not isinstance(node.get("text"), str):
+            _fail("Texto inválido.")
+        if not clean_text(node["text"]):
             _fail("Texto inválido.")
         out["text"] = node["text"]
         if node.get("marks"):
@@ -86,7 +99,7 @@ def _node(node, depth):
         anchor, label = attrs.get("anchor", ""), attrs.get("label", "")
         if anchor != "" and not valid_anchor(anchor):
             _fail("Âncora inválida.")
-        if not isinstance(label, str):
+        if not isinstance(label, str) or not clean_text(label):
             _fail("Menção inválida.")
         out["attrs"] = {"record": attrs["record"], "anchor": anchor, "label": label}
     content = node.get("content")

@@ -9,6 +9,7 @@ class Record(models.Model):
     group = models.ForeignKey("campaigns.ListGroup", null=True, blank=True, on_delete=models.SET_NULL)
     main_image = models.ForeignKey("assets.Asset", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     version = models.PositiveIntegerField(default=1)
+    field_versions = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

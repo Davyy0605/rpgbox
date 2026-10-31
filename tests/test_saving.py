@@ -198,3 +198,50 @@ def test_detail_renders_blocks_in_order(client, user, character):
     assert html.index("primeiro") < html.index("segundo")
     assert "data-editor" in html and "data-save-url" in html and "data-suggest-url" in html
     assert "data-version" in html
+
+
+def _field_keys(record, kind, n=1):
+    return [f.key for f in record.record_type.fielddef_set.filter(kind=kind)[:n]]
+
+
+def test_field_versions_are_per_key(character):
+    k1, k2 = _field_keys(character, "short")[0], _field_keys(character, "long")[0]
+    assert save_field(character, k1, "a", 1).version == 2
+    r = save_field(character, k2, "b", 1)
+    assert r.ok and r.version == 2
+    assert save_field(character, k1, "c", 1).ok is False
+    character.refresh_from_db()
+    assert character.version == 1
+
+
+def test_bad_bodies_return_400(client, user, text_block, character):
+    client.force_login(user)
+    url = f"/blocos/{text_block.id}/"
+    assert client.post(url, b"[" * 200000, content_type="application/json").status_code == 400
+    for bad in ("\ud800", "a\u0000b"):
+        body = '{"version": 1, "content": {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":%s}]}]}}'
+        import json as _j
+        r = client.post(url, body % _j.dumps(bad), content_type="application/json")
+        assert r.status_code == 400, bad
+    key = _field_keys(character, "short")[0]
+    for bad in ("\ud800", "a\u0000b"):
+        r = client.post(f"/r/{character.id}/campos/", _j.dumps({"key": key, "value": bad, "version": 1}),
+                        content_type="application/json")
+        assert r.status_code == 400, bad
+
+
+def test_rename_refreshes_embed_label(elf, character):
+    from records.save import rename_record
+    b = add_embed(tab_of(character), elf, "")
+    rename_record(elf, "Elfos Altos")
+    elf.delete()
+    b.refresh_from_db()
+    assert resolve_embed(b).label == "Elfos Altos"
+
+
+def test_panel_renders_long_field_with_mention(client, user, character, elf):
+    client.force_login(user)
+    key = _field_keys(character, "long")[0]
+    assert save_field(character, key, doc_mention(elf.id, "Elfos"), 1).ok
+    html = client.get(f"/r/{character.id}/painel/").content.decode()
+    assert f'data-record="{elf.id}"' in html and "'type'" not in html

@@ -88,7 +88,7 @@ def record_detail(request, record_id):
         "upload_tab": scope_tab,
         "blocks": blocks,
         "record": record, "campaign": record.campaign, "tabs": tabs, "selected": selected,
-        "parent": parent, "gallery": gallery, "citations": citations(record), "fields": visible_fields(record),
+        "parent": parent, "gallery": gallery, "citations": citations(record), "fields": _display_fields(record),
         "group_form": GroupChoiceForm(record.record_type, initial={"group": record.group_id}),
     })
 
@@ -96,7 +96,7 @@ def record_detail(request, record_id):
 @login_required
 def record_panel(request, record_id):
     record = get_record(request.user, record_id)
-    return render(request, "records/_panel.html", {"record": record, "fields": visible_fields(record)})
+    return render(request, "records/_panel.html", {"record": record, "fields": _display_fields(record)})
 
 
 @login_required
@@ -133,6 +133,12 @@ def subtab_add(request, record_id, tab_id):
     return redirect(f"/r/{record.id}/?aba={sub.id}")
 
 
+def _display_fields(record):
+    resolver = resolver_for(record.campaign)
+    return [(f, render_doc(v, resolver) if f.kind == "long" and isinstance(v, dict) else v)
+            for f, v in visible_fields(record)]
+
+
 def _block_views(tab, record):
     resolver = resolver_for(record.campaign)
     out = []
@@ -147,7 +153,7 @@ def _block_views(tab, record):
 def _json_body(request):
     try:
         data = json.loads(request.body)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     return data if isinstance(data, dict) else None
 

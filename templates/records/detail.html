@@ -11,11 +11,6 @@
 {% for item in blocks %}{% include "records/_block.html" %}{% empty %}<p class="muted">Sem conteúdo.</p>{% endfor %}
 <div class="block-actions">
   <form method="post" action="{% url 'block-add' selected.id %}">{% csrf_token %}<button class="btn" type="submit">+ Texto</button></form>
-  <form method="post" action="{% url 'embed-add' selected.id %}" class="form">{% csrf_token %}
-    <input type="number" name="record" placeholder="Número do registro" aria-label="Registro a incorporar" required>
-    <input type="text" name="anchor" maxlength="64" placeholder="Título (opcional)" aria-label="Âncora do título">
-    <button class="btn" type="submit">Incorporar</button>
-  </form>
 </div>
 {% include "assets/_gallery.html" %}
 {% else %}
