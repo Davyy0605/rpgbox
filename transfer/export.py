@@ -1,4 +1,5 @@
 """Exportação legível de uma campanha: zip com Markdown e arquivos. Não há importação."""
+import logging
 import re
 import zipfile
 
@@ -9,7 +10,9 @@ from content.markdown import doc_to_markdown
 from records.models import Block, Record, Tab
 from records.sections import section
 
-_UNSAFE = re.compile(r'[\x00-\x1f<>:"/\\|?*]+')
+logger = logging.getLogger(__name__)
+
+_UNSAFE =re.compile(r'[\x00-\x1f<>:"/\\|?*]+')
 
 
 def safe_name(value, fallback="sem-nome"):
@@ -109,6 +112,7 @@ def write_export(campaign, fileobj) -> None:
                .select_related("record_type").order_by("record_type__position", "record_type_id", "id"))
     type_names = _Names()
     type_dirs = {}
+    errors = []
     record_names = {}
     with zipfile.ZipFile(fileobj, "w", zipfile.ZIP_DEFLATED) as zf:
         for record in records:
@@ -122,13 +126,16 @@ def write_export(campaign, fileobj) -> None:
             for asset in Asset.objects.filter(record=record).order_by("created_at", "id"):
                 target = f"{folder}/arquivos/{file_names.get_file(asset.filename)}"
                 try:
-                    with default_storage.open(asset.key, "rb") as src, \
-                            zf.open(zipfile.ZipInfo(target), "w") as dst:
-                        _copy(src, dst)
+                    # Lê antes de abrir a entrada do zip: uma falha não deixa entrada parcial.
+                    # Limite de 25 MB por arquivo, então cabe na memória.
+                    with default_storage.open(asset.key, "rb") as src:
+                        data = src.read()
                 except Exception:
+                    logger.exception("Falha ao exportar arquivo %s (%s)", asset.filename, asset.key)
+                    errors.append(f"{target}: não foi possível ler o arquivo")
                     continue
-
-
-def _copy(src, dst):
-    while chunk := src.read(1024 * 1024):
-        dst.write(chunk)
+                info = zipfile.ZipInfo(target)
+                info.compress_type = zipfile.ZIP_STORED
+                zf.writestr(info, data)
+        if errors:
+            zf.writestr("erros.txt", "Arquivos não exportados:\n" + "\n".join(errors) + "\n")

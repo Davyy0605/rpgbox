@@ -76,3 +76,73 @@ def test_export_view_is_owner_only(client, user, other_user, campaign):
     r = client.get(url)
     assert r.status_code == 200 and "attachment" in r["Content-Disposition"]
     assert zipfile.is_zipfile(io.BytesIO(b"".join(r.streaming_content)))
+
+
+def test_missing_storage_key_is_reported_not_swallowed(campaign, caplog):
+    from assets.models import Asset
+    r = make_record(campaign, "Personagens", "Kael")
+    store_upload(r, None, SimpleUploadedFile("ok.txt", b"ok", content_type="text/plain"))
+    a = store_upload(r, None, SimpleUploadedFile("sumiu.txt", b"x", content_type="text/plain"))
+    Asset.objects.filter(pk=a.pk).update(key="nao/existe.txt")
+    z = export(campaign)
+    assert z.testzip() is None
+    assert "Personagens/Kael/arquivos/ok.txt" in z.namelist()
+    assert not any(n.endswith("sumiu.txt") for n in z.namelist())
+    assert "sumiu.txt" in z.read("erros.txt").decode()
+    assert "Falha ao exportar" in caplog.text
+
+
+def test_no_erros_file_when_all_ok(campaign):
+    make_record(campaign, "Personagens", "Kael")
+    assert "erros.txt" not in export(campaign).namelist()
+
+
+def test_export_basic_fields(campaign):
+    from campaigns.models import FieldDef
+    r = make_record(campaign, "Personagens", "Kael")
+    fd = FieldDef.objects.create(record_type=r.record_type, label="Classe", kind="short", position=99)
+    r.fields = {fd.key: "Mago"}
+    r.save()
+    assert "**Classe:** Mago" in export(campaign).read("Personagens/Kael/registro.md").decode()
+
+
+def test_export_subtab(campaign):
+    r = make_record(campaign, "Personagens", "Kael")
+    parent = Tab.objects.create(record=r, title="Historia", position=50)
+    sub = Tab.objects.create(record=r, title="Infancia", parent=parent, position=51)
+    b = add_text_block(sub)
+    b.content = doc("Nasceu longe")
+    b.save()
+    md = export(campaign).read("Personagens/Kael/registro.md").decode()
+    assert "## Historia" in md and "### Infancia" in md and "Nasceu longe" in md
+    assert md.index("## Historia") < md.index("### Infancia") < md.index("Nasceu longe")
+
+
+def test_export_embed_with_anchor(campaign):
+    from tests.helpers import doc_headings
+    a = make_record(campaign, "Locais", "Torre")
+    text_block(a, doc_headings((2, "sec-a", "Secao A"), "texto da A", (2, "sec-b", "Secao B"), "texto da B"))
+    b = make_record(campaign, "Locais", "Mapa")
+    add_embed(first_tab(b), a, "sec-b")
+    md = export(campaign).read("Locais/Mapa/registro.md").decode()
+    assert "texto da B" in md and "texto da A" not in md
+
+
+def test_export_removed_embed_target(campaign):
+    a = make_record(campaign, "Locais", "Torre")
+    b = make_record(campaign, "Locais", "Mapa")
+    add_embed(first_tab(b), a, "")
+    a.delete()
+    md = export(campaign).read("Locais/Mapa/registro.md").decode()
+    assert "Torre" in md and "removido" in md
+
+
+def test_export_tab_file_and_duplicate_filenames(campaign):
+    r = make_record(campaign, "Personagens", "Kael")
+    tab = first_tab(r)
+    store_upload(r, tab, SimpleUploadedFile("mapa.txt", b"1", content_type="text/plain"))
+    store_upload(r, None, SimpleUploadedFile("mapa.txt", b"2", content_type="text/plain"))
+    z = export(campaign)
+    files = sorted(n for n in z.namelist() if "/arquivos/" in n)
+    assert files == ["Personagens/Kael/arquivos/mapa (2).txt", "Personagens/Kael/arquivos/mapa.txt"]
+    assert {z.read(n) for n in files} == {b"1", b"2"}
