@@ -1,3 +1,4 @@
+import json
 import re
 
 import pytest
@@ -160,6 +161,77 @@ def test_failed_load_says_so_and_can_be_closed(page, live_server, logged_in, cha
     expect(page).to_have_url(list_url(character))
 
 
+def test_switching_rows_during_a_held_load_shows_the_second_panel(page, live_server, logged_in, campaign, character):
+    other = make_record(campaign, "Personagens", "Mira")
+    page.goto(list_url(character))
+    held = []
+    page.route(f"**/r/{character.id}/painel/", lambda route: held.append(route))
+    page.get_by_text("Kael").click()
+    expect(page.locator("[data-sheet]")).to_contain_text("Kael")
+    while not held:
+        page.wait_for_timeout(20)
+    page.locator(f'[data-panel-url="/r/{other.id}/painel/"]').click()
+    expect(page.get_by_role("link", name="Expandir")).to_be_visible()
+    sheet = page.locator("[data-sheet]")
+    expect(sheet).to_contain_text("Mira")
+    expect(sheet).not_to_contain_text("Não foi possível abrir")
+
+
+def test_back_during_a_held_load_does_not_fail(page, live_server, logged_in, character, elf):
+    add_mention(character, elf)
+    page.goto(f"{list_url(character)}?painel={character.id}")
+    held = []
+    page.route(f"**/r/{elf.id}/painel/", lambda route: held.append(route))
+    page.locator("[data-sheet] .mention").click()
+    expect(page.locator("[data-sheet]")).to_contain_text("Elfos")
+    while not held:
+        page.wait_for_timeout(20)
+    page.go_back()
+    expect(page.get_by_role("link", name="Expandir")).to_be_visible()
+    sheet = page.locator("[data-sheet]")
+    expect(sheet).to_contain_text("Kael")
+    expect(sheet).not_to_contain_text("Não foi possível abrir")
+
+
+def test_row_tap_refetches_after_an_edit(page, live_server, logged_in, character):
+    occupation = character.record_type.fielddef_set.get(label="Ocupação").key
+    character.fields[occupation] = "Ladino"
+    character.save()
+    page.goto(list_url(character)); page.get_by_text("Kael").click()
+    expect(page.locator("[data-sheet]")).to_contain_text("Ladino")
+    page.locator("[data-sheet-close]").click()
+    expect(page.locator("[data-sheet]")).to_be_hidden()
+    character.fields[occupation] = "Bardo"
+    character.save()
+    page.get_by_text("Kael").click()
+    expect(page.locator("[data-sheet]")).to_contain_text("Bardo")
+
+
+def test_row_tap_says_so_when_the_record_was_deleted(page, live_server, logged_in, campaign, character):
+    gone = make_record(campaign, "Personagens", "Mira")
+    page.goto(list_url(character))
+    page.locator(f'[data-panel-url="/r/{gone.id}/painel/"]').click()
+    expect(page.locator("[data-sheet]")).to_contain_text("Mira")
+    expect(page.get_by_role("link", name="Expandir")).to_be_visible()
+    page.locator("[data-sheet-close]").click()
+    expect(page.locator("[data-sheet]")).to_be_hidden()
+    stale_selector = f'[data-panel-url="/r/{gone.id}/painel/"]'
+    gone.delete()
+    page.locator(stale_selector).click()
+    expect(page.locator("[data-sheet]")).to_contain_text("Não foi possível abrir")
+
+
+def test_restored_page_forgets_the_panels_it_held(page, live_server, logged_in, character, elf):
+    add_mention(character, elf); page.goto(list_url(character)); page.get_by_text("Kael").click()
+    page.locator("[data-sheet] .mention").click()
+    expect(page.get_by_role("link", name="Expandir")).to_be_visible()
+    expect(page.locator("[data-sheet]")).to_contain_text("Elfos")
+    page.evaluate("window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}))")
+    with page.expect_request(f"**/r/{character.id}/painel/"):
+        page.go_back()
+    expect(page.locator("[data-sheet]")).to_contain_text("Kael")
+
+
 def test_expired_session_goes_to_login_instead_of_filling_the_panel(page, live_server, logged_in, character):
     page.goto(list_url(character))
     page.context.clear_cookies()
@@ -282,6 +354,38 @@ def test_drag_down_closes_and_uses_history(page, live_server, logged_in, charact
     swipe_down(page, "[data-sheet]")
     expect(page.locator("[data-sheet]")).to_be_hidden()
     expect(page).to_have_url(list_url(character))
+
+
+SLOW_SLIDE = """
+    const realTimeout = window.setTimeout;
+    window.setTimeout = (fn, ms, ...rest) => realTimeout(fn, ms === 160 ? 1500 : ms, ...rest);
+"""
+
+
+def test_back_during_the_slide_is_not_doubled(page, live_server, logged_in, character):
+    page.add_init_script(SLOW_SLIDE)
+    home = f"/c/{character.campaign_id}/"
+    page.goto(home); page.goto(list_url(character)); page.get_by_text("Kael").click()
+    expect(page.get_by_role("link", name="Expandir")).to_be_visible()
+    swipe_down(page, "[data-sheet]")
+    page.evaluate("history.back()")
+    expect(page.locator("[data-sheet]")).to_be_hidden()
+    expect(page).to_have_url(list_url(character))
+    page.wait_for_timeout(1800)
+    expect(page).to_have_url(list_url(character))
+
+
+def test_history_event_brings_a_dragged_sheet_back_on_screen(page, live_server, logged_in, character):
+    page.add_init_script(SLOW_SLIDE)
+    page.goto(list_url(character)); page.get_by_text("Kael").click()
+    expect(page.get_by_role("link", name="Expandir")).to_be_visible()
+    swipe_down(page, "[data-sheet]")
+    page.evaluate("window.dispatchEvent(new PopStateEvent('popstate', {state: history.state}))")
+    page.wait_for_timeout(1800)
+    sheet = page.locator("[data-sheet]")
+    expect(sheet).to_be_visible()
+    assert sheet.evaluate("el => el.style.transform") == ""
+    assert sheet.bounding_box()["y"] < 844
 
 
 def test_short_drag_keeps_the_panel_in_place(page, live_server, logged_in, character):
@@ -449,6 +553,30 @@ def test_trail_survives_blocked_session_storage(page, live_server, logged_in, ch
     page.goto(list_url(character)); page.get_by_text("Kael").click()
     expect(page.get_by_role("link", name="Expandir")).to_be_visible()
     assert errors == []
+
+
+@pytest.mark.parametrize("stored", [
+    "[null]", "[1, \"x\"]", "{}", "\"x\"", "não é json",
+    '[{"label": 1, "url": "/a/"}]', '[{"label": "a"}]',
+])
+def test_corrupt_trail_does_not_cost_the_panel(page, live_server, logged_in, character, stored):
+    page.add_init_script(
+        f"sessionStorage.setItem('rpgbox-trail-{character.campaign_id}', {json.dumps(stored)})")
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(list_url(character)); page.get_by_text("Kael").click()
+    expect(page.get_by_role("link", name="Expandir")).to_be_visible()
+    assert errors == []
+
+
+@pytest.mark.parametrize("url", ["javascript:alert(1)", "https://mal.example/", "//mal.example/"])
+def test_trail_drops_links_that_leave_the_site(page, live_server, logged_in, character, url):
+    stored = json.dumps([{"label": "Fora", "url": url}])
+    page.add_init_script(
+        f"sessionStorage.setItem('rpgbox-trail-{character.campaign_id}', {json.dumps(stored)})")
+    page.goto(list_url(character)); page.get_by_text("Kael").click()
+    expect(page.get_by_role("link", name="Expandir")).to_be_visible()
+    expect(page.locator("[data-trail]")).not_to_contain_text("Fora")
 
 
 # Cópia

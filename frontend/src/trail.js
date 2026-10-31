@@ -8,10 +8,15 @@ function storageKey() {
   return `rpgbox-trail-${document.body.dataset.campaign ?? ""}`;
 }
 
+// O armazenamento pode vir corrompido: só valem rótulo e caminho interno, nunca link para fora.
+function isItem(item) {
+  return typeof item?.label === "string" && typeof item?.url === "string" && /^\/(?![/\\])/.test(item.url);
+}
+
 function read() {
   try {
     const items = JSON.parse(sessionStorage.getItem(storageKey()));
-    return Array.isArray(items) ? items : [];
+    return Array.isArray(items) ? items.filter(isItem) : [];
   } catch {
     return [];
   }
@@ -63,7 +68,12 @@ export function refreshTrail() {
 export function initTrail() {
   nav = document.querySelector("[data-trail]");
   plainCrumbs = nav?.innerHTML ?? "";
-  refreshTrail();
+  try {
+    refreshTrail();
+  } catch (error) {
+    // O caminho é acessório: um erro aqui não pode impedir o painel de iniciar.
+    console.error(error);
+  }
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) refreshTrail();
   });

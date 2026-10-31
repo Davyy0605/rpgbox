@@ -9,6 +9,7 @@ const SLIDE_MS = 160;
 let host = null;
 let opener = null;
 let wanted = null;
+let slide = null;
 const loaded = new Map();
 
 const sheet = () => host.querySelector("[data-sheet]");
@@ -63,10 +64,11 @@ function fail() {
   current.insertAdjacentHTML("beforeend", '<p class="muted">Não foi possível abrir.</p>');
 }
 
-function show({ panel, title }) {
+function show({ panel, title }, { returning = false } = {}) {
   stopLoading();
   const rising = !sheet();
-  if (loaded.has(panel)) {
+  // Só ao voltar: um toque novo sempre pergunta ao servidor, para não mostrar registro velho ou apagado.
+  if (returning && loaded.has(panel)) {
     host.innerHTML = loaded.get(panel);
     sheet().classList.toggle("rising", rising);
     settled();
@@ -74,8 +76,12 @@ function show({ panel, title }) {
   }
   // O painel sobe no mesmo instante; o conteúdo chega depois, sem segurar o toque.
   host.replaceChildren(emptySheet(panel, title, rising));
-  wanted = panel;
-  htmx.ajax("GET", panel, { source: host, target: host, swap: "innerHTML" }).catch(fail);
+  const request = { panel };
+  wanted = request;
+  // O htmx também rejeita ao abortar: só conta a falha do pedido que ainda é o atual.
+  htmx.ajax("GET", panel, { source: host, target: host, swap: "innerHTML" }).catch(() => {
+    if (wanted === request) fail();
+  });
 }
 
 function hide() {
@@ -86,13 +92,21 @@ function hide() {
   opener = null;
 }
 
+function stopSlide() {
+  clearTimeout(slide);
+  slide = null;
+  sheet()?.style.removeProperty("transform");
+}
+
 function syncToHistory() {
+  stopSlide();
   const { panel } = history.state ?? {};
   if (!panel) hide();
-  else if (sheet()?.dataset.panelSrc !== panel) show(history.state);
+  else if (sheet()?.dataset.panelSrc !== panel) show(history.state, { returning: true });
 }
 
 function dismiss() {
+  stopSlide();
   if (depth()) history.go(-depth());
 }
 
@@ -127,7 +141,7 @@ function initDrag() {
   let distance = 0;
   host.addEventListener("touchstart", (event) => {
     const current = sheet();
-    const atTop = current && current.scrollTop <= 0;
+    const atTop = current && current.scrollTop <= 0 && !slide;
     start = atTop && !window.matchMedia(DESKTOP).matches
       ? { y: event.touches[0].clientY, at: event.timeStamp }
       : null;
@@ -159,7 +173,10 @@ function initDrag() {
       return;
     }
     current.style.transform = "translateY(100%)";
-    setTimeout(() => history.back(), SLIDE_MS);
+    slide = setTimeout(() => {
+      slide = null;
+      history.back();
+    }, SLIDE_MS);
   };
   host.addEventListener("touchend", finish);
   host.addEventListener("touchcancel", finish);
@@ -195,16 +212,17 @@ export function initSheet() {
     if (event.key === "Escape" && sheet() && !event.target.closest?.("input, [contenteditable]")) dismiss();
   });
   window.addEventListener("popstate", syncToHistory);
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) loaded.clear();
+  });
   host.addEventListener("htmx:beforeSwap", (event) => {
     const { xhr, serverResponse } = event.detail;
-    if (!wanted) {
-      event.detail.shouldSwap = false; // o painel foi fechado enquanto a resposta chegava
-    } else if (xhr.status === 200 &&!new URL(xhr.responseURL).pathname.endsWith("/painel/")) {
+    if (xhr.status === 200 && !new URL(xhr.responseURL).pathname.endsWith("/painel/")) {
       // Sessão vencida: a resposta é a tela de login, que não cabe no painel.
       window.location.reload();
       event.detail.shouldSwap = false;
     } else if (xhr.status === 200) {
-      loaded.set(wanted, serverResponse);
+      loaded.set(wanted.panel, serverResponse);
     }
   });
   host.addEventListener("htmx:afterSwap", () => {
