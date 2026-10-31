@@ -8,10 +8,12 @@
       <form method="post" action="{% url 'asset-delete' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Excluir</button></form>
     </div>
   </li>
-  {% empty %}<li class="muted">Sem imagens.</li>{% endfor %}
+  {% empty %}{% if not files %}<li class="muted">Sem arquivos.</li>{% endif %}{% endfor %}
 </ul>
+{% include "assets/_files.html" %}
 <form method="post" action="{% url 'asset-upload' record.id %}" enctype="multipart/form-data" class="form">
   {% csrf_token %}
-  <input type="file" name="file" accept="image/*" aria-label="Adicionar imagem" required>
+  {% if upload_tab %}<input type="hidden" name="tab" value="{{ upload_tab }}">{% endif %}
+  <input type="file" name="file" aria-label="Adicionar arquivo" required>
   <button class="btn" type="submit">Enviar</button>
 </form>

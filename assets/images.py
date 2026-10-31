@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 Image.MAX_IMAGE_PIXELS = 50_000_000
-ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "GIF"}
+ALLOWED_FORMATS = ["JPEG", "PNG", "WEBP", "GIF"]
+MAX_PIXELS_JPEG = 100_000_000
+MAX_PIXELS_OTHER = 25_000_000
 
 
 class InvalidFile(Exception):
@@ -19,27 +21,34 @@ class ProcessedImage:
     height: int
 
 
-def _webp(img, limit):
-    img = img.copy()
-    img.thumbnail((limit, limit))
+def _webp(img):
     buf = io.BytesIO()
     img.save(buf, "WEBP", quality=80)
-    return buf.getvalue(), img.size
+    return buf.getvalue()
 
 
 def process_image(file):
     try:
         file.seek(0)
-        img = Image.open(file)
-        if img.format not in ALLOWED_FORMATS:
-            raise InvalidFile("Imagem em formato não aceito. Use JPEG, PNG, WebP ou GIF.")
+        img = Image.open(file, formats=ALLOWED_FORMATS)
+        pixels = img.size[0] * img.size[1]  # lido do cabeçalho, antes de decodificar
+        if pixels > (MAX_PIXELS_JPEG if img.format == "JPEG" else MAX_PIXELS_OTHER):
+            raise InvalidFile("A imagem tem pixels demais. Reduza a resolução e envie de novo.")
+        if img.format == "JPEG":
+            img.draft("RGB", (3200, 3200))
         img.seek(0)  # GIF animado: só o primeiro quadro
+        img.load()
+        img.thumbnail((1600, 1600))
         img = ImageOps.exif_transpose(img)
-        img = img.convert("RGBA" if "A" in img.getbands() or img.mode == "P" else "RGB")
-        data, size = _webp(img, 1600)
-        thumb, _ = _webp(img, 400)
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGBA" if "A" in img.getbands() or img.mode == "P" else "RGB")
+        data = _webp(img)
+        size = img.size
+        img.thumbnail((400, 400))
+        thumb = _webp(img)
     except InvalidFile:
         raise
-    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError, EOFError):
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError,
+            Image.DecompressionBombWarning, EOFError):
         raise InvalidFile("Não foi possível ler essa imagem. O arquivo parece corrompido.")
     return ProcessedImage(data, thumb, size[0], size[1])

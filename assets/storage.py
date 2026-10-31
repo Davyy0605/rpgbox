@@ -5,6 +5,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import transaction
 from django.db.models import Sum
+from django.utils.http import content_disposition_header
 
 from .images import InvalidFile, process_image
 from .models import Asset
@@ -83,7 +84,7 @@ def kind_of_open(asset):
 def asset_url(asset, variant="full", inline=False):
     key = asset.thumb_key if variant == "thumb" and asset.thumb_key else asset.key
     if default_storage.__class__.__name__ == "S3Storage":
-        disposition = "inline" if inline else f'attachment; filename="{asset.filename}"'
+        disposition = "inline" if inline else content_disposition_header(True, asset.filename)
         return default_storage.url(key, parameters={"ResponseContentDisposition": disposition,
                                                     "ResponseContentType": asset.content_type})
     return default_storage.url(key)

@@ -114,10 +114,11 @@ def test_first_gallery_image_becomes_main(record, small_png):
     assert record.main_image == a
 
 
-def test_deleting_asset_removes_storage_and_main(record, small_png):
+def test_deleting_asset_removes_storage_and_main(record, small_png, django_capture_on_commit_callbacks):
     a = store_upload(record, None, small_png)
     key, thumb = a.key, a.thumb_key
-    a.delete()
+    with django_capture_on_commit_callbacks(execute=True):
+        a.delete()
     record.refresh_from_db()
     assert record.main_image is None and not default_storage.exists(key) and not default_storage.exists(thumb)
 
@@ -206,3 +207,72 @@ def test_campaign_list_shows_storage(client, record, user, small_png):
     store_upload(record, None, small_png)
     client.force_login(user)
     assert "Espaço usado" in client.get("/c/").content.decode()
+
+
+# fix round 1
+
+def _solid_png(w, h, mode="RGB"):
+    buf = io.BytesIO()
+    Image.new(mode, (w, h), (10, 20, 30) if mode == "RGB" else (10, 20, 30, 255)).save(buf, "PNG", compress_level=1)
+    return buf.getvalue()
+
+
+def test_60mp_png_refused(record):
+    with pytest.raises(InvalidFile):
+        store_upload(record, None, upload("g.png", _solid_png(7746, 7746)))
+
+
+def test_30mp_png_refused(record):
+    with pytest.raises(InvalidFile):
+        store_upload(record, None, upload("g.png", _solid_png(6000, 5000)))
+
+
+def test_26mp_jpeg_accepted_at_1600(record):
+    a = store_upload(record, None, upload("g.jpg", _img("JPEG", (6000, 4400), quality=30)))
+    assert max(Image.open(default_storage.open(a.key)).size) == 1600
+
+
+def test_pdf_without_tab_in_gallery_and_tab_files_in_tab(client, record, user, small_png):
+    tab = record.tab_set.first()
+    client.force_login(user)
+    client.post(f"/r/{record.id}/arquivos/", {"file": upload("sem-aba.pdf", b"%PDF-1.4")})
+    client.post(f"/r/{record.id}/arquivos/", {"file": upload("na-aba.pdf", b"%PDF-1.4"), "tab": tab.id})
+    client.post(f"/r/{record.id}/arquivos/", {"file": small_png, "tab": tab.id})
+    gal = client.get(f"/r/{record.id}/?aba=galeria").content.decode()
+    assert "sem-aba.pdf" in gal and "na-aba.pdf" not in gal
+    assert 'class="gal-img"' not in gal
+    inside = client.get(f"/r/{record.id}/?aba={tab.id}").content.decode()
+    assert "na-aba.pdf" in inside and 'class="gal-img"' in inside and "sem-aba.pdf" not in inside
+
+
+def test_s3_content_disposition_escapes_filename(record):
+    from unittest import mock
+
+    a = store_upload(record, None, upload("x.pdf", b"%PDF-1.4"))
+    a.filename = 'Ação "x".pdf'
+    fake = mock.Mock()
+    fake.__class__ = type("S3Storage", (), {})
+    fake.url.return_value = "https://s3/x"
+    with mock.patch("assets.storage.default_storage", fake):
+        asset_url(a)
+    disposition = fake.url.call_args.kwargs["parameters"]["ResponseContentDisposition"]
+    assert disposition.startswith("attachment;") and 'filename="A' not in disposition
+    assert "filename*=" in disposition
+
+
+def test_deleting_record_removes_storage_after_commit(record, small_png, django_capture_on_commit_callbacks):
+    a = store_upload(record, None, small_png)
+    key, thumb = a.key, a.thumb_key
+    with django_capture_on_commit_callbacks(execute=True):
+        record.delete()
+    assert not default_storage.exists(key) and not default_storage.exists(thumb)
+
+
+def test_storage_failure_does_not_break_delete(record, small_png, django_capture_on_commit_callbacks):
+    from unittest import mock
+
+    a = store_upload(record, None, small_png)
+    with mock.patch("django.core.files.storage.default_storage.delete", side_effect=OSError("boom")):
+        with django_capture_on_commit_callbacks(execute=True):
+            a.delete()
+    assert not Asset.objects.filter(pk=a.pk).exists()

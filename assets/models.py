@@ -1,7 +1,10 @@
+import logging
 import uuid
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
+
+logger = logging.getLogger(__name__)
 
 
 class Asset(models.Model):
@@ -33,8 +36,15 @@ from django.dispatch import receiver  # noqa: E402
 
 @receiver(post_delete, sender=Asset)
 def remove_files(sender, instance, **kwargs):
-    from django.core.files.storage import default_storage
+    keys = [k for k in (instance.key, instance.thumb_key) if k]
 
-    for key in (instance.key, instance.thumb_key):
-        if key:
-            default_storage.delete(key)
+    def _remove():
+        from django.core.files.storage import default_storage
+
+        for key in keys:
+            try:
+                default_storage.delete(key)
+            except Exception:
+                logger.exception("Falha ao remover objeto de armazenamento %s", key)
+
+    transaction.on_commit(_remove)

@@ -73,9 +73,11 @@ def record_detail(request, record_id):
         if selected is None and tabs:
             selected = parent = tabs[0]
     assets = record.asset_set.all()
+    scope_tab = None if gallery or selected is None else selected.id
     return render(request, "records/detail.html", {
-        "images": [a for a in assets if a.kind == "image"],
-        "files": [a for a in assets if a.kind != "image" and selected and a.tab_id == selected.id],
+        "images": [a for a in assets if a.kind == "image" and a.tab_id == scope_tab],
+        "files": [a for a in assets if a.kind != "image" and a.tab_id == scope_tab],
+        "upload_tab": scope_tab,
         "record": record, "campaign": record.campaign, "tabs": tabs, "selected": selected,
         "parent": parent, "gallery": gallery, "citations": citations(record), "fields": visible_fields(record),
         "group_form": GroupChoiceForm(record.record_type, initial={"group": record.group_id}),

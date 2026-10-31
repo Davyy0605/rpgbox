@@ -59,6 +59,10 @@ def _serve(asset, inline, variant):
     return resp
 
 
+def _back(asset):
+    return f"/r/{asset.record_id}/?aba={asset.tab_id or 'galeria'}"
+
+
 @login_required
 @require_POST
 def asset_main(request, asset_id):
@@ -66,13 +70,13 @@ def asset_main(request, asset_id):
     if asset.kind == "image":
         asset.record.main_image = asset
         asset.record.save(update_fields=["main_image"])
-    return redirect(f"/r/{asset.record_id}/?aba=galeria")
+    return redirect(_back(asset))
 
 
 @login_required
 @require_POST
 def asset_delete(request, asset_id):
     asset = get_asset(request.user, asset_id)
-    record_id = asset.record_id
+    back = _back(asset)
     asset.delete()
-    return redirect(f"/r/{record_id}/?aba=galeria")
+    return redirect(back)
