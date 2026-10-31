@@ -134,6 +134,8 @@ def test_escape_outside_click_and_scroll_close_the_menu(page, live_server, logge
         make_record(campaign, "Personagens", f"Extra {n}")
     page.goto(list_url(character))
     row = page.get_by_role("link", name="Kael")
+    row.scroll_into_view_if_needed()
+    page.wait_for_timeout(200)  # o evento dessa rolagem chega depois e fecharia o menu recém-aberto
     row.click(button="right")
     expect(menu(page)).to_be_visible()
     page.keyboard.press("Escape")
