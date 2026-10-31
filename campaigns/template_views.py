@@ -6,7 +6,7 @@ from django.views.decorators.http import require_POST
 
 from records.forms import TitleForm
 
-from .access import get_campaign
+from .access import deleted, get_campaign
 from .models import FieldDef, ListGroup, RecordType, TabDef
 
 
@@ -20,7 +20,25 @@ def _owned(queryset, user, pk, path):
     return get_object_or_404(queryset, pk=pk, **{path: user})
 
 
-def _back(rtype):
+def _body(rtype):
+    tabs = list(rtype.tabdef_set.filter(removed=False).order_by("position", "id"))
+    tops = [t for t in tabs if t.parent_id is None]
+    for t in tops:
+        t.subs = [s for s in tabs if s.parent_id == t.id]
+    return {
+        "campaign": rtype.campaign, "rtype": rtype, "kinds": FieldDef.KINDS, "tabs": tops,
+        "fields": rtype.fielddef_set.filter(removed=False).order_by("position", "id"),
+        "groups": rtype.listgroup_set.order_by("position", "id"),
+    }
+
+
+def template_body(request, rtype):
+    return render(request, "campaigns/_template_body.html", _body(rtype))
+
+
+def _back(request, rtype):
+    if "HX-Request" in request.headers:
+        return template_body(request, rtype)
     return redirect("template-edit", campaign_id=rtype.campaign_id, type_id=rtype.id)
 
 
@@ -64,15 +82,7 @@ def _group(user, group_id):
 def template_edit(request, campaign_id, type_id):
     campaign = get_campaign(request.user, campaign_id)
     rtype = get_object_or_404(campaign.recordtype_set, pk=type_id)
-    tabs = list(rtype.tabdef_set.filter(removed=False).order_by("position", "id"))
-    tops = [t for t in tabs if t.parent_id is None]
-    for t in tops:
-        t.subs = [s for s in tabs if s.parent_id == t.id]
-    return render(request, "campaigns/template_edit.html", {
-        "campaign": campaign, "rtype": rtype, "kinds": FieldDef.KINDS, "tabs": tops,
-        "fields": rtype.fielddef_set.filter(removed=False).order_by("position", "id"),
-        "groups": rtype.listgroup_set.order_by("position", "id"),
-    })
+    return render(request, "campaigns/template_edit.html", _body(rtype))
 
 
 # Campos
@@ -85,7 +95,7 @@ def field_add(request, type_id):
     if label and kind in dict(FieldDef.KINDS):
         FieldDef.objects.create(record_type=rtype, label=label, kind=kind,
                                 position=_next(rtype.fielddef_set))
-    return _back(rtype)
+    return _back(request, rtype)
 
 
 @login_required
@@ -96,7 +106,7 @@ def field_rename(request, field_id):
     if label:
         f.label = label
         f.save(update_fields=["label"])
-    return _back(f.record_type)
+    return _back(request, f.record_type)
 
 
 @login_required
@@ -104,7 +114,7 @@ def field_rename(request, field_id):
 def field_move(request, field_id):
     f = _field(request.user, field_id)
     _move(f.record_type.fielddef_set.filter(removed=False), f, request.POST.get("dir"))
-    return _back(f.record_type)
+    return _back(request, f.record_type)
 
 
 @login_required
@@ -113,7 +123,7 @@ def field_remove(request, field_id):
     f = _field(request.user, field_id)
     f.removed = True
     f.save(update_fields=["removed"])
-    return _back(f.record_type)
+    return _back(request, f.record_type)
 
 
 # Abas do modelo
@@ -130,7 +140,7 @@ def tabdef_add(request, type_id):
             return HttpResponseBadRequest("Sub-abas têm um único nível.")
     if title:
         TabDef.objects.create(record_type=rtype, parent=parent, title=title, position=_next(rtype.tabdef_set))
-    return _back(rtype)
+    return _back(request, rtype)
 
 
 @login_required
@@ -141,7 +151,7 @@ def tabdef_rename(request, tabdef_id):
     if title:
         d.title = title
         d.save(update_fields=["title"])
-    return _back(d.record_type)
+    return _back(request, d.record_type)
 
 
 @login_required
@@ -149,7 +159,7 @@ def tabdef_rename(request, tabdef_id):
 def tabdef_move(request, tabdef_id):
     d = _tabdef(request.user, tabdef_id)
     _move(d.record_type.tabdef_set.filter(parent_id=d.parent_id, removed=False), d, request.POST.get("dir"))
-    return _back(d.record_type)
+    return _back(request, d.record_type)
 
 
 @login_required
@@ -158,7 +168,7 @@ def tabdef_remove(request, tabdef_id):
     d = _tabdef(request.user, tabdef_id)
     TabDef.objects.filter(pk=d.pk).update(removed=True)
     TabDef.objects.filter(parent=d).update(removed=True)
-    return _back(d.record_type)
+    return _back(request, d.record_type)
 
 
 # Sub-abas da lista (adicionar é group-add)
@@ -171,7 +181,7 @@ def group_rename(request, group_id):
     if name:
         g.name = name
         g.save(update_fields=["name"])
-    return _back(g.record_type)
+    return _back(request, g.record_type)
 
 
 @login_required
@@ -180,4 +190,4 @@ def group_remove(request, group_id):
     g = _group(request.user, group_id)
     rtype = g.record_type
     g.delete()  # registros ficam sem sub-aba (SET_NULL)
-    return _back(rtype)
+    return deleted(request, _back(request, rtype))

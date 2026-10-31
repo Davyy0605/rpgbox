@@ -14,16 +14,16 @@
   </div>{% endfor %}
 </section>
 {% endif %}
-{% include "records/_tabs.html" %}
+<div id="abas" hx-target="this" hx-swap="innerHTML show:none">{% include "records/_tabs.html" %}</div>
 {% if gallery %}
 {% include "assets/_gallery.html" %}
 {% elif selected %}
 <h2>{{ selected.title }}</h2>
-{% for item in blocks %}{% include "records/_block.html" %}{% empty %}<div class="block text-block">{% include "records/_editor.html" with e=new_block %}</div>{% endfor %}
+<div id="blocos">{% for item in blocks %}{% include "records/_block.html" %}{% empty %}<div class="block text-block">{% include "records/_editor.html" with e=new_block %}</div>{% endfor %}</div>
 <div class="block-actions">
-  {% if blocks %}<form method="post" action="{% url 'block-add' selected.id %}">{% csrf_token %}<button class="btn" type="submit">+ Texto</button></form>{% endif %}
+  {% if blocks %}<form method="post" action="{% url 'block-add' selected.id %}" hx-post="{% url 'block-add' selected.id %}" hx-target="#blocos" hx-swap="beforeend show:none">{% csrf_token %}<button class="btn" type="submit">+ Texto</button></form>{% endif %}
   <details class="picker"><summary class="btn-link">Incorporar</summary>
-    <form method="post" action="{% url 'embed-add' selected.id %}" data-embed-picker data-suggest-url="{% url 'suggest' campaign.id %}" data-self="{{ record.id }}">{% csrf_token %}
+    <form method="post" action="{% url 'embed-add' selected.id %}" hx-post="{% url 'embed-add' selected.id %}" hx-target="#blocos" hx-swap="beforeend show:none" data-embed-picker data-suggest-url="{% url 'suggest' campaign.id %}" data-self="{{ record.id }}">{% csrf_token %}
       <input type="hidden" name="record"><input type="hidden" name="anchor">
       <input type="search" role="combobox" aria-label="Origem" aria-autocomplete="list" aria-expanded="false" placeholder="Registro ou título" autocomplete="off">
     </form>

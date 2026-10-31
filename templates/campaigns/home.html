@@ -15,7 +15,7 @@
 <ul class="list" id="results"></ul>
 <ul class="list">
   {% for t in types %}
-  <li class="type-row"><a class="type-link" href="{% url 'record-list' campaign.id t.id %}">{{ t.name }} <span class="muted">{{ t.total }}</span></a><a class="plus" href="{% url 'record-new' campaign.id t.id %}" aria-label="Novo em {{ t.name }}">+</a></li>
+  <li class="type-row" data-delete-url="{% url 'type-delete' campaign.id t.id %}"><a class="type-link" href="{% url 'record-list' campaign.id t.id %}">{{ t.name }} <span class="muted">{{ t.total }}</span></a><a class="plus" href="{% url 'record-new' campaign.id t.id %}" aria-label="Novo em {{ t.name }}">+</a></li>
   {% endfor %}
 </ul>
 {% endblock %}
