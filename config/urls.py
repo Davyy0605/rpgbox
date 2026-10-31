@@ -16,4 +16,5 @@ urlpatterns = [
     path("", include("indexing.urls")),
     path("", include("assets.urls")),
     path("", include("transfer.export_urls")),
+    path("", include("transfer.urls")),
 ]

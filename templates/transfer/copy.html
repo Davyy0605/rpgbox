@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Copiar {{ record.name }}{% endblock %}
+{% block crumbs %}<a href="{% url 'record-detail' record.id %}">{{ record.name }}</a>{% endblock %}
+{% block content %}
+<h1>Copiar {{ record.name }}</h1>
+{% if options %}
+<p>A cópia leva campos, abas, textos e arquivos, e fica independente do original.</p>
+<form method="post" class="form">{% csrf_token %}
+  <label for="dest">Campanha de destino</label>
+  <select id="dest" name="campaign" required>{% for c in options %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+  <button class="btn" type="submit">Copiar</button>
+</form>
+{% else %}
+<p class="muted">Você não tem outra campanha para receber a cópia.</p>
+{% endif %}
+<p><a class="btn-link" href="{% url 'record-detail' record.id %}">Voltar</a></p>
+{% endblock %}
