@@ -1,0 +1,7 @@
+Django>=5.2.8,<5.3
+dj-database-url
+psycopg[binary]
+whitenoise
+gunicorn
+Pillow
+django-storages[s3]

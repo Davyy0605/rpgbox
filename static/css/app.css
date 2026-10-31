@@ -1,0 +1,31 @@
+:root {
+  --bg: #14110f;
+  --surface: #1f1a17;
+  --border: #3a302a;
+  --text: #ece4d8;
+  --muted: #a89c8c;
+  --accent: #c9a24b;
+  --danger: #d96a5b;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overflow-x: hidden;
+}
+a { color: var(--accent); display: inline-block; padding: 10px 0; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 0 16px; min-height: 52px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.brand { color: var(--accent); font-weight: 700; text-decoration: none; }
+.page { padding: 16px; max-width: 480px; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 8px 0 16px; }
+.form > div { margin-bottom: 14px; }
+.form label { display: block; margin-bottom: 4px; }
+.form input { width: 100%; min-height: 44px; padding: 8px 12px; font-size: 16px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.form .helptext { color: var(--muted); font-size: .85rem; }
+.form .errorlist { color: var(--danger); list-style: none; padding: 0; margin: 0 0 4px; }
+.btn { min-height: 44px; padding: 0 20px; font-size: 16px; color: #14110f; background: var(--accent); border: 0; border-radius: 6px; cursor: pointer; }
+@media (min-width: 768px) { .page { padding: 32px 16px; } }
