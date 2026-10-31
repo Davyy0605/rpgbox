@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from campaigns.access import get_block, get_campaign, get_record, get_tab
-from content.doc import as_doc, safe_href
+from content.doc import SEP, as_doc, headings, safe_href
 from content.render import editor_doc, render_doc
 from campaigns.models import ListGroup
 
@@ -16,6 +16,7 @@ from indexing.services import citations, resolver_for
 
 from .forms import GroupChoiceForm, RecordForm, RenameForm, TitleForm
 from .models import Record
+from .sections import find_section
 from .save import (add_embed, add_text_block, delete_block, delete_preview, rename_record, resolve_embed,
                    save_block, save_field)
 from .services import add_record_tab, add_subtab, create_record, visible_fields, visible_tabs
@@ -38,10 +39,12 @@ def record_list(request, campaign_id, type_id):
         if current is None:
             raise Http404
         records = records.filter(group=current)
+    link = rtype.fielddef_set.filter(kind="link", removed=False).order_by("position", "id").first()
     return render(request, "records/list.html", {
-        "campaign": campaign, "rtype": rtype, "records": records, "groups": groups,
+        "campaign": campaign, "rtype": rtype, "records": _with_copy_links(records, link), "groups": groups,
         "current_group": current, "gallery": request.GET.get("v") == "galeria",
-        "has_link": rtype.fielddef_set.filter(kind="link", removed=False).exists(),
+        "has_link": link is not None, "panel": _requested_panel(request, campaign),
+        "crumb_url": reverse("record-list", args=[campaign.id, rtype.id]),
     })
 
 
@@ -73,6 +76,10 @@ def record_detail(request, record_id):
     record = get_record(request.user, record_id)
     tabs = visible_tabs(record)
     selected_key = request.GET.get("aba", "")
+    passage = request.GET.get("trecho", "")
+    found, found_tab = find_section(record, passage) if passage else (None, None)
+    if found_tab and not selected_key:
+        selected_key = str(found_tab)
     gallery = selected_key == "galeria"
     selected = parent = None
     if not gallery:
@@ -94,13 +101,14 @@ def record_detail(request, record_id):
         "record": record, "campaign": record.campaign, "tabs": tabs, "selected": selected,
         "parent": parent, "gallery": gallery, "citations": citations(record), "fields": _detail_fields(record),
         "group_form": GroupChoiceForm(record.record_type, initial={"group": record.group_id}),
+        "panel": _requested_panel(request, record.campaign), **_crumb(record, passage, found),
     })
 
 
 @login_required
 def record_panel(request, record_id):
     record = get_record(request.user, record_id)
-    return render(request, "records/_panel.html", {"record": record, "fields": _display_fields(record)})
+    return render(request, "records/_panel.html", {"panel": _panel(record, request.GET.get("ancora", ""))})
 
 
 @login_required
@@ -135,6 +143,38 @@ def subtab_add(request, record_id, tab_id):
         return redirect(f"/r/{record.id}/?aba={parent.id}")
     sub = add_subtab(parent, form.cleaned_data["title"])
     return redirect(f"/r/{record.id}/?aba={sub.id}")
+
+
+def _with_copy_links(records, link):
+    records = list(records)
+    for r in records:
+        value = r.fields.get(link.key) if link else None
+        r.copy_link = value if safe_href(value) else None
+    return records
+
+
+def _crumb(record, anchor, found):
+    url = reverse("record-detail", args=[record.id])
+    if found is None:
+        return {"crumb": record.name, "crumb_url": url}
+    return {"crumb": f"{record.name}{SEP}{dict(headings(found))[anchor]}", "crumb_url": f"{url}?trecho={anchor}#{anchor}"}
+
+
+def _panel(record, anchor):
+    found = find_section(record, anchor)[0] if anchor else None
+    panel = {"record": record, "src": reverse("record-panel", args=[record.id]), **_crumb(record, anchor, found)}
+    if found is None:
+        return {**panel, "fields": _display_fields(record)}
+    return {**panel, "src": f"{panel['src']}?ancora={anchor}", "section": render_doc(found, resolver_for(record.campaign))}
+
+
+def _requested_panel(request, campaign):
+    """Painel de `?painel=`: id inválido ou fora da campanha é ignorado, sem revelar se existe."""
+    try:
+        record = get_record(request.user, int(request.GET.get("painel", "")))
+    except (ValueError, Http404):
+        return None
+    return _panel(record, request.GET.get("ancora", "")) if record.campaign_id == campaign.id else None
 
 
 def _display_fields(record):

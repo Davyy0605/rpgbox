@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ record.name }} · {{ campaign.name }}{% endblock %}
+{% block crumb %} data-crumb="{{ crumb }}" data-crumb-url="{{ crumb_url }}"{% endblock %}
 {% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a> › <a href="{% url 'record-list' campaign.id record.record_type_id %}">{{ record.record_type.name }}</a>{% endblock %}
 {% block content %}
 <h1>{{ record.name }}</h1>
@@ -49,4 +50,5 @@
   <button class="btn" type="submit">Salvar</button>
 </form>
 {% endif %}
+<div id="panel">{% if panel %}{% include "records/_panel.html" %}{% endif %}</div>
 {% endblock %}

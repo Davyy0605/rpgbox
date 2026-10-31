@@ -40,10 +40,13 @@ def _mention(node, names):
     if name is None:
         return format_html("<s>{}</s>", attrs.get("label") if isinstance(attrs.get("label"), str) else "")
     href = reverse("record-detail", args=[record])
+    panel = reverse("record-panel", args=[record])
     if valid_anchor(anchor):
-        return format_html('<a class="mention" href="{}#{}" data-record="{}" data-anchor="{}">{}</a>',
-                           href, anchor, record, anchor, name)
-    return format_html('<a class="mention" href="{}" data-record="{}">{}</a>', href, record, name)
+        return format_html('<a class="mention" href="{}?trecho={}#{}" data-panel-url="{}?ancora={}" '
+                           'data-record="{}" data-anchor="{}">{}</a>',
+                           href, anchor, anchor, panel, anchor, record, anchor, name)
+    return format_html('<a class="mention" href="{}" data-panel-url="{}" data-record="{}">{}</a>',
+                       href, panel, record, name)
 
 
 def _children(node, names, depth):
