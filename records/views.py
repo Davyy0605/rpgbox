@@ -33,12 +33,9 @@ def record_list(request, campaign_id, type_id):
     campaign, rtype = _type(request.user, campaign_id, type_id)
     groups = list(rtype.listgroup_set.order_by("position", "id"))
     records = rtype.record_set.select_related("main_image").order_by("name")
-    current = None
-    g = request.GET.get("g", "")
-    if g:
-        current = next((x for x in groups if str(x.id) == g), None)
-        if current is None:
-            raise Http404
+    # Sub-aba desconhecida mostra "Todas": o voltar pode trazer o endereço de uma que já foi apagada.
+    current = next((x for x in groups if str(x.id) == request.GET.get("g", "")), None)
+    if current:
         records = records.filter(group=current)
     link = rtype.fielddef_set.filter(kind="link", removed=False).order_by("position", "id").first()
     return render(request, "records/list.html", {

@@ -227,6 +227,13 @@ def test_list_group_by_menu_keeps_its_records(signed_in, kael):
     assert kael.group is None
 
 
+def test_address_of_a_deleted_filter_shows_the_list(signed_in, kael):
+    group = ListGroup.objects.create(record_type=kael.record_type, name="G")
+    post_delete(signed_in, f"/modelo/grupo/{group.id}/remover/")
+    r = signed_in.get(f"/c/{kael.campaign_id}/t/{kael.record_type_id}/?g={group.id}")
+    assert r.status_code == 200 and r.context["current_group"] is None and b"Kael" in r.content
+
+
 def test_asset_by_menu_answers_json(signed_in, kael, django_capture_on_commit_callbacks):
     asset = stored_png(kael)
     with django_capture_on_commit_callbacks(execute=True):
