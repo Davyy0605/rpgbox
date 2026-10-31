@@ -1,0 +1,3 @@
+<div class="editor" data-editor="{{ e.kind }}" data-label="{{ e.label }}" data-doc="{{ e.doc_id }}" data-missing="{{ e.missing }}"
+     data-suggest-url="{% url 'suggest' campaign.id %}"{% if e.save_url %} data-save-url="{{ e.save_url }}" data-version="{{ e.version }}"{% endif %}{% if e.create_url %} data-create-url="{{ e.create_url }}"{% endif %}{% if e.key %} data-key="{{ e.key }}"{% endif %}></div>
+{{ e.doc|json_script:e.doc_id }}

@@ -1,8 +1,12 @@
+import json
+import re
+
 import pytest
 from django.core.exceptions import ValidationError
 
+from content.render import editor_doc
 from indexing.models import Link, SearchEntry
-from indexing.services import reindex_record, search
+from indexing.services import reindex_record, resolver_for, search
 from records.models import Block
 from records.save import add_embed, delete_preview, resolve_embed, save_block, save_field
 
@@ -245,3 +249,75 @@ def test_panel_renders_long_field_with_mention(client, user, character, elf):
     assert save_field(character, key, doc_mention(elf.id, "Elfos"), 1).ok
     html = client.get(f"/r/{character.id}/painel/").content.decode()
     assert f'data-record="{elf.id}"' in html and "'type'" not in html
+
+
+def _editor_doc(html, doc_id):
+    match = re.search(rf'<script id="{doc_id}" type="application/json">(.*?)</script>', html, re.S)
+    return json.loads(match.group(1))
+
+
+def test_block_mount_has_doc_json_and_no_rendered_html_or_form(client, user, character, elf):
+    client.force_login(user)
+    block = Block.objects.get(tab__record=character, kind="text")
+    block.content = doc_mention(elf.id, "Elfos", "visao")
+    block.save()
+    html = client.get(f"/r/{character.id}/").content.decode()
+    mount = re.search(r'<div class="editor" data-editor="text".*?></div>', html, re.S).group(0)
+    assert f'data-doc="bloco-{block.id}"' in mount and "<form" not in mount
+    assert _editor_doc(html, f"bloco-{block.id}") == block.content
+    assert 'class="mention"' not in html
+    assert "Remover bloco" in html
+
+
+def test_editor_doc_uses_current_names_and_lists_deleted(character, elf):
+    content = doc_mention(elf.id, "Velho › Visão", "visao")
+    content["content"][0]["content"].append(doc_mention(999999, "Sumiu")["content"][0]["content"][0])
+    out, missing = editor_doc(content, resolver_for(elf.campaign))
+    nodes = out["content"][0]["content"]
+    assert nodes[0]["attrs"]["label"] == "Elfos › Visão" and nodes[1]["attrs"]["label"] == "Sumiu"
+    assert missing == [999999]
+    assert content["content"][0]["content"][0]["attrs"]["label"] == "Velho › Visão"
+
+
+def test_detail_shows_fields_and_long_field_mount(client, user, character):
+    client.force_login(user)
+    defs = {f.label: f for f in character.record_type.fielddef_set.all()}
+    resumo = defs["Resumo"]
+    character.fields = {defs["Ocupação"].key: "Ladino", resumo.key: doc("meio-elfo")}
+    character.field_versions = {resumo.key: 7}
+    character.save()
+    html = client.get(f"/r/{character.id}/").content.decode()
+    mount = re.search(r'<div class="editor" data-editor="field".*?></div>', html, re.S).group(0)
+    assert "Ladino" in html and "Idade" in html
+    assert f'data-key="{resumo.key}"' in mount and 'data-version="7"' in mount
+    assert f'data-save-url="/r/{character.id}/campos/"' in mount
+    assert _editor_doc(html, f"campo-{resumo.id}") == doc("meio-elfo")
+
+
+def test_link_field_only_links_safe_addresses(client, user, campaign):
+    client.force_login(user)
+    track = make_record(campaign, "Trilhas", "Tema")
+    key = track.record_type.fielddef_set.get(kind="link").key
+    track.fields = {key: "https://exemplo.com/a"}
+    track.save()
+    assert 'href="https://exemplo.com/a"' in client.get(f"/r/{track.id}/").content.decode()
+    track.fields = {key: "javascript:alert(1)"}
+    track.save()
+    assert 'href="javascript' not in client.get(f"/r/{track.id}/").content.decode()
+
+
+def test_empty_tab_offers_editor_without_creating_a_block(client, user, campaign):
+    client.force_login(user)
+    record = make_record(campaign, "Regiões", "Porto")
+    tab = record.tab_set.order_by("position", "id").first()
+    html = client.get(f"/r/{record.id}/").content.decode()
+    assert f'data-create-url="/abas/{tab.id}/blocos/"' in html
+    assert not Block.objects.filter(tab=tab).exists()
+
+
+def test_block_add_answers_json_when_asked(client, user, character):
+    client.force_login(user)
+    tab = tab_of(character)
+    r = client.post(f"/abas/{tab.id}/blocos/", headers={"Accept": "application/json"})
+    block = Block.objects.filter(tab=tab, kind="text").order_by("-id").first()
+    assert r.json() == {"save_url": f"/blocos/{block.id}/", "version": 1}

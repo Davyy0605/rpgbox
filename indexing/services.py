@@ -3,13 +3,11 @@ from dataclasses import dataclass
 from django.db import transaction
 from django.db.models import Q
 
-from content.doc import headings, is_int, iter_nodes, plain_text
+from content.doc import SEP, headings, is_int, iter_nodes, plain_text
 from records.models import Block, Record
 
 from .models import Link, SearchEntry
 from .normalize import normalize
-
-SEP = " › "
 
 
 @dataclass

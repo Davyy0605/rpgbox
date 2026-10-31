@@ -11,6 +11,7 @@ MARKS = {"bold", "italic", "link"}
 SAFE_SCHEMES = {"http", "https", "mailto"}
 MAX_DEPTH = 32
 ANCHOR_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+SEP = " › "
 _BAD_URL_CHARS = re.compile(r"[\x00-\x20\x7f-\x9f  ]")
 
 
@@ -115,6 +116,15 @@ def validate_doc(doc: dict) -> dict:
     if not isinstance(doc, dict) or doc.get("type") != "doc":
         _fail("Documento inválido.")
     return _node(doc, 0)
+
+
+def as_doc(value) -> dict:
+    """Valor de campo longo como documento; textos antigos viram um parágrafo."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value:
+        return {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": value}]}]}
+    return {"type": "doc", "content": []}
 
 
 def iter_nodes(doc):

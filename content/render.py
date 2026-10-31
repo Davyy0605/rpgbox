@@ -1,9 +1,11 @@
 """render_doc: único caminho do texto guardado até o HTML."""
+import copy
+
 from django.urls import reverse
 from django.utils.html import escape, format_html
 from django.utils.safestring import SafeString, mark_safe
 
-from .doc import MAX_DEPTH, is_int, iter_nodes, safe_href, valid_anchor
+from .doc import MAX_DEPTH, SEP, is_int, iter_nodes, safe_href, valid_anchor
 
 _SIMPLE = {"paragraph": "p", "bulletList": "ul", "orderedList": "ol", "listItem": "li"}
 
@@ -72,6 +74,20 @@ def _node(node, names, depth):
             return format_html('<h{0} id="{1}">{2}</h{0}>', level, attrs["anchor"], inner)
         return format_html("<h{0}>{1}</h{0}>", level, inner)
     return ""  # nó desconhecido: descartado, nunca emitido
+
+
+def editor_doc(doc, resolve) -> tuple[dict, list[int]]:
+    """Cópia para o editor com os nomes atuais nas menções, e os ids de destinos apagados."""
+    out = copy.deepcopy(doc)
+    ids = _mention_ids(out)
+    names = resolve(ids) if ids else {}
+    for node in iter_nodes(out):
+        attrs = node.get("attrs") or {}
+        name = names.get(attrs.get("record")) if node.get("type") == "mention" else None
+        if name is not None:
+            _, sep, heading = attrs.get("label", "").rpartition(SEP)
+            attrs["label"] = f"{name}{sep}{heading}" if sep and attrs.get("anchor") else name
+    return out, [i for i in ids if i not in names]
 
 
 def render_doc(doc, resolve) -> SafeString:

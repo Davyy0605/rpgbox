@@ -3,14 +3,27 @@
 {% block crumbs %}<a href="{% url 'campaign-home' campaign.id %}">{{ campaign.name }}</a> › <a href="{% url 'record-list' campaign.id record.record_type_id %}">{{ record.record_type.name }}</a>{% endblock %}
 {% block content %}
 <h1>{{ record.name }}</h1>
+{% if fields %}
+<section class="fields" aria-label="Campos">
+  {% for f in fields %}<div class="field"><span class="muted">{{ f.label }}</span>
+    {% if f.editor %}{% include "records/_editor.html" with e=f.editor %}{% elif f.href %}<a href="{{ f.href }}" target="_blank" rel="noopener noreferrer nofollow">{{ f.value }}</a>{% elif f.value != "" and f.value != None %}<span>{{ f.value }}</span>{% else %}<span class="muted">—</span>{% endif %}
+  </div>{% endfor %}
+</section>
+{% endif %}
 {% include "records/_tabs.html" %}
 {% if gallery %}
 {% include "assets/_gallery.html" %}
 {% elif selected %}
 <h2>{{ selected.title }}</h2>
-{% for item in blocks %}{% include "records/_block.html" %}{% empty %}<p class="muted">Sem conteúdo.</p>{% endfor %}
+{% for item in blocks %}{% include "records/_block.html" %}{% empty %}<div class="block text-block">{% include "records/_editor.html" with e=new_block %}</div>{% endfor %}
 <div class="block-actions">
-  <form method="post" action="{% url 'block-add' selected.id %}">{% csrf_token %}<button class="btn" type="submit">+ Texto</button></form>
+  {% if blocks %}<form method="post" action="{% url 'block-add' selected.id %}">{% csrf_token %}<button class="btn" type="submit">+ Texto</button></form>{% endif %}
+  <details class="picker"><summary class="btn-link">Incorporar</summary>
+    <form method="post" action="{% url 'embed-add' selected.id %}" data-embed-picker data-suggest-url="{% url 'suggest' campaign.id %}" data-self="{{ record.id }}">{% csrf_token %}
+      <input type="hidden" name="record"><input type="hidden" name="anchor">
+      <input type="search" role="combobox" aria-label="Origem" aria-autocomplete="list" aria-expanded="false" placeholder="Registro ou título" autocomplete="off">
+    </form>
+  </details>
 </div>
 {% include "assets/_gallery.html" %}
 {% else %}

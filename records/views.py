@@ -4,10 +4,12 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from campaigns.access import get_block, get_campaign, get_record, get_tab
-from content.render import render_doc
+from content.doc import as_doc, safe_href
+from content.render import editor_doc, render_doc
 from campaigns.models import ListGroup
 
 from indexing.services import citations, resolver_for
@@ -87,8 +89,9 @@ def record_detail(request, record_id):
         "files": [a for a in assets if a.kind != "image" and a.tab_id == scope_tab],
         "upload_tab": scope_tab,
         "blocks": blocks,
+        "new_block": _new_block_editor(selected) if selected is not None and not blocks else None,
         "record": record, "campaign": record.campaign, "tabs": tabs, "selected": selected,
-        "parent": parent, "gallery": gallery, "citations": citations(record), "fields": _display_fields(record),
+        "parent": parent, "gallery": gallery, "citations": citations(record), "fields": _detail_fields(record),
         "group_form": GroupChoiceForm(record.record_type, initial={"group": record.group_id}),
     })
 
@@ -139,6 +142,31 @@ def _display_fields(record):
             for f, v in visible_fields(record)]
 
 
+def _editor(kind, doc, resolver, doc_id, label, **attrs):
+    content, missing = editor_doc(as_doc(doc), resolver)
+    return {"kind": kind, "doc": content, "doc_id": doc_id, "label": label,
+            "missing": ",".join(map(str, missing)), **attrs}
+
+
+def _detail_fields(record):
+    resolver = resolver_for(record.campaign)
+    out = []
+    for f, value in visible_fields(record):
+        item = {"label": f.label, "value": value}
+        if f.kind == "long":
+            item["editor"] = _editor("field", value, resolver, f"campo-{f.id}", f.label, key=f.key,
+                                     save_url=reverse("field-save", args=[record.id]),
+                                     version=record.field_versions.get(f.key, 1))
+        elif f.kind == "link" and safe_href(value):
+            item["href"] = value
+        out.append(item)
+    return out
+
+
+def _new_block_editor(tab):
+    return _editor("text", None, None, f"aba-{tab.id}", "Texto", create_url=reverse("block-add", args=[tab.id]))
+
+
 def _block_views(tab, record):
     resolver = resolver_for(record.campaign)
     out = []
@@ -146,7 +174,9 @@ def _block_views(tab, record):
         if b.kind == "embed":
             out.append({"block": b, "embed": resolve_embed(b)})
         else:
-            out.append({"block": b, "html": render_doc(b.content, resolver)})
+            out.append({"block": b, "editor": _editor("text", b.content, resolver, f"bloco-{b.id}", "Texto",
+                                                      save_url=reverse("block-save", args=[b.id]),
+                                                      version=b.version)})
     return out
 
 
@@ -167,7 +197,9 @@ def _version(data):
 @require_POST
 def block_add(request, tab_id):
     tab = get_tab(request.user, tab_id)
-    add_text_block(tab)
+    block = add_text_block(tab)
+    if request.headers.get("Accept") == "application/json":
+        return JsonResponse({"save_url": reverse("block-save", args=[block.id]), "version": block.version})
     return redirect(f"/r/{tab.record_id}/?aba={tab.id}")
 
 
