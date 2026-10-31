@@ -54,3 +54,14 @@ h1 { font-size: 1.4rem; margin: 8px 0 16px; }
 .thumb { display: flex; align-items: center; justify-content: center; height: 96px; margin: 8px 0; color: var(--muted); background: var(--bg); border-radius: 8px; }
 .sheet dd { margin: 0 0 8px; }
 @media (min-width: 768px) { .grid { grid-template-columns: repeat(4, 1fr); } .page { max-width: 720px; } }
+
+/* Editor de modelo */
+.edit-list { list-style: none; padding: 0; margin: 0 0 12px; }
+.edit-list > li { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.edit-list.sub { margin: 8px 0 0 16px; }
+.edit-list.sub > li { border-bottom: 0; padding: 4px 0; }
+.edit-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.edit-row input:not([type=hidden]), .edit-row select { flex: 1; min-width: 0; min-height: 44px; padding: 8px 12px; font-size: 16px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.edit-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.edit-actions form { margin: 0; }
+.edit-list button.btn-link { background: transparent; color: var(--text); font-size: 16px; cursor: pointer; }

@@ -29,5 +29,6 @@
   {% for r in records %}<li><a href="{% url 'record-detail' r.id %}" hx-get="{% url 'record-panel' r.id %}" hx-target="#panel">{{ r.name }}</a></li>{% empty %}<li class="muted">Nenhum registro.</li>{% endfor %}
 </ul>
 {% endif %}
+<p><a class="btn-link" href="{% url 'template-edit' campaign.id rtype.id %}">Personalizar</a></p>
 <div id="panel"></div>
 {% endblock %}
