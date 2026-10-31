@@ -38,7 +38,7 @@ def save_block(block, content, base_version) -> SaveResult:
     """Salva o texto se `base_version` ainda é a do servidor; senão devolve o texto atual."""
     clean = validate_doc(content)
     with transaction.atomic():
-        locked = Block.objects.select_for_update().select_related("tab__record").get(pk=block.pk)
+        locked = Block.objects.select_for_update(of=("self",), no_key=True).select_related("tab__record").get(pk=block.pk)
         if locked.kind != "text":
             raise ValidationError("Bloco não é de texto.")
         if locked.version != base_version:
@@ -62,7 +62,7 @@ def save_field(record, key, value, base_version) -> SaveResult:
     if not clean_text(key):  # NUL ou substituto solto derrubaria a consulta (500)
         raise ValidationError("Campo inexistente.")
     with transaction.atomic():
-        locked = Record.objects.select_for_update().select_related("record_type").get(pk=record.pk)
+        locked = Record.objects.select_for_update(no_key=True).select_related("record_type").get(pk=record.pk)
         fdef = locked.record_type.fielddef_set.filter(key=key).first()
         if fdef is None:
             raise ValidationError("Campo inexistente.")
@@ -96,7 +96,7 @@ def first_text_block(tab) -> tuple[Block, bool]:
     O pedido é repetido quando a resposta se perde, e repetir não pode criar outro bloco.
     """
     with transaction.atomic():
-        Tab.objects.select_for_update().get(pk=tab.pk)
+        Tab.objects.select_for_update(no_key=True).get(pk=tab.pk)
         existing = tab.block_set.filter(kind="text").order_by("position", "id").first()
         return (existing, False) if existing else (add_text_block(tab), True)
 

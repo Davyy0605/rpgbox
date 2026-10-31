@@ -40,6 +40,8 @@ def _docs(record):
 
 @transaction.atomic
 def reindex_record(record) -> None:
+    # Serializa reindexações do mesmo registro: sem isso, duas apagam o antigo e ambas inserem o novo.
+    Record.objects.select_for_update(no_key=True).get(pk=record.pk)
     Link.objects.filter(source_record=record).delete()
     SearchEntry.objects.filter(record=record).delete()
     links, seen, entries, texts = [], set(), [], []
