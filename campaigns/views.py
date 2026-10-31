@@ -3,6 +3,8 @@ from django.db.models import Count
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from assets.storage import storage_used
+
 from .access import get_campaign
 from .defaults import seed_campaign
 from .forms import CampaignForm, RecordTypeForm
@@ -27,7 +29,8 @@ def campaign_list(request):
         seed_campaign(c)
         return redirect("campaign-home", campaign_id=c.id)
     campaigns = Campaign.objects.filter(owner=request.user).order_by("name")
-    return render(request, "campaigns/list.html", {"campaigns": campaigns, "form": form})
+    return render(request, "campaigns/list.html", {"campaigns": campaigns, "form": form,
+                                                   "storage_mb": round(storage_used(request.user) / (1024 * 1024), 1)})
 
 
 @login_required

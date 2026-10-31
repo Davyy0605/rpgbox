@@ -3,7 +3,7 @@
     <h2>{{ record.name }}</h2>
     <a class="plus" href="{% url 'record-list' record.campaign_id record.record_type_id %}" aria-label="Fechar">×</a>
   </div>
-  <div class="thumb" aria-hidden="true">{{ record.name }}</div>
+  {% if record.main_image %}<img class="thumb-img" src="{% url 'asset-file' record.main_image_id %}?v=thumb&amp;inline=1" alt="{{ record.name }}">{% else %}<div class="thumb" aria-hidden="true">{{ record.name }}</div>{% endif %}
   <dl>
     {% for f, value in fields %}{% if value != "" and value != None %}<dt class="muted">{{ f.label }}</dt><dd>{{ value }}</dd>{% endif %}{% endfor %}
   </dl>

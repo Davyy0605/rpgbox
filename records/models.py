@@ -7,6 +7,7 @@ class Record(models.Model):
     name = models.CharField(max_length=160)
     fields = models.JSONField(default=dict, blank=True)
     group = models.ForeignKey("campaigns.ListGroup", null=True, blank=True, on_delete=models.SET_NULL)
+    main_image = models.ForeignKey("assets.Asset", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

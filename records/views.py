@@ -21,7 +21,7 @@ def _type(user, campaign_id, type_id):
 def record_list(request, campaign_id, type_id):
     campaign, rtype = _type(request.user, campaign_id, type_id)
     groups = list(rtype.listgroup_set.order_by("position", "id"))
-    records = rtype.record_set.order_by("name")
+    records = rtype.record_set.select_related("main_image").order_by("name")
     current = None
     g = request.GET.get("g", "")
     if g:
@@ -72,7 +72,10 @@ def record_detail(request, record_id):
                     selected, parent = cand, t
         if selected is None and tabs:
             selected = parent = tabs[0]
+    assets = record.asset_set.all()
     return render(request, "records/detail.html", {
+        "images": [a for a in assets if a.kind == "image"],
+        "files": [a for a in assets if a.kind != "image" and selected and a.tab_id == selected.id],
         "record": record, "campaign": record.campaign, "tabs": tabs, "selected": selected,
         "parent": parent, "gallery": gallery, "citations": citations(record), "fields": visible_fields(record),
         "group_form": GroupChoiceForm(record.record_type, initial={"group": record.group_id}),

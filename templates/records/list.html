@@ -22,11 +22,11 @@
 </nav>
 {% if gallery %}
 <ul class="grid">
-  {% for r in records %}<li><a class="tile" href="{% url 'record-detail' r.id %}" hx-get="{% url 'record-panel' r.id %}" hx-target="#panel">{{ r.name }}</a></li>{% empty %}<li class="muted">Nenhum registro.</li>{% endfor %}
+  {% for r in records %}<li><a class="tile" href="{% url 'record-detail' r.id %}" hx-get="{% url 'record-panel' r.id %}" hx-target="#panel">{% if r.main_image %}<img class="tile-img" src="{% url 'asset-file' r.main_image_id %}?v=thumb&amp;inline=1" alt="" loading="lazy">{% endif %}{{ r.name }}</a></li>{% empty %}<li class="muted">Nenhum registro.</li>{% endfor %}
 </ul>
 {% else %}
 <ul class="list">
-  {% for r in records %}<li><a href="{% url 'record-detail' r.id %}" hx-get="{% url 'record-panel' r.id %}" hx-target="#panel">{{ r.name }}</a></li>{% empty %}<li class="muted">Nenhum registro.</li>{% endfor %}
+  {% for r in records %}<li><a class="row-link" href="{% url 'record-detail' r.id %}" hx-get="{% url 'record-panel' r.id %}" hx-target="#panel">{% if r.main_image %}<img class="row-img" src="{% url 'asset-file' r.main_image_id %}?v=thumb&amp;inline=1" alt="" loading="lazy">{% else %}<span class="row-img" aria-hidden="true"></span>{% endif %}{{ r.name }}</a></li>{% empty %}<li class="muted">Nenhum registro.</li>{% endfor %}
 </ul>
 {% endif %}
 <p><a class="btn-link" href="{% url 'template-edit' campaign.id rtype.id %}">Personalizar</a></p>

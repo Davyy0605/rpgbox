@@ -1,0 +1,17 @@
+<ul class="grid">
+  {% for a in images %}
+  <li class="gal-item">
+    <a href="{% url 'asset-open' a.id %}"><img src="{% url 'asset-file' a.id %}?v=thumb&amp;inline=1" alt="{{ a.filename }}" loading="lazy" class="gal-img"></a>
+    <div class="gal-actions">
+      {% if record.main_image_id == a.id %}<span class="muted">Principal</span>{% else %}
+      <form method="post" action="{% url 'asset-main' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Tornar principal</button></form>{% endif %}
+      <form method="post" action="{% url 'asset-delete' a.id %}">{% csrf_token %}<button class="btn-link" type="submit">Excluir</button></form>
+    </div>
+  </li>
+  {% empty %}<li class="muted">Sem imagens.</li>{% endfor %}
+</ul>
+<form method="post" action="{% url 'asset-upload' record.id %}" enctype="multipart/form-data" class="form">
+  {% csrf_token %}
+  <input type="file" name="file" accept="image/*" aria-label="Adicionar imagem" required>
+  <button class="btn" type="submit">Enviar</button>
+</form>

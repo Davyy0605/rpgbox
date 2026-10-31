@@ -5,10 +5,11 @@
 <h1>{{ record.name }}</h1>
 {% include "records/_tabs.html" %}
 {% if gallery %}
-<p class="muted">Sem imagens.</p>
+{% include "assets/_gallery.html" %}
 {% elif selected %}
 <h2>{{ selected.title }}</h2>
 <p class="muted">Sem conteúdo.</p>
+{% include "assets/_files.html" %}
 {% else %}
 <p class="muted">Este registro não tem abas. Use + para criar uma.</p>
 {% endif %}
