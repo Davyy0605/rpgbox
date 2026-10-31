@@ -7,8 +7,17 @@ services:
     startCommand: gunicorn config.wsgi --workers 1 --threads 4 --timeout 120
     healthCheckPath: /health
     envVars:
+      # Versão completa exigida pelo Render (docs: render.com/docs/python-version, lida em 2026-10-31).
+      # 3.14.3 é a versão em que o código e os testes rodaram; Pillow e psycopg-binary têm wheel
+      # Linux x86_64 cp314 (conferido com pip download). Se o Render recusar, veja docs/deploy.md.
       - key: PYTHON_VERSION
         value: 3.14.3
+      # R2 não implementa os checksums extras do boto3 recente: só calcular quando a operação exige.
+      # Nomes e valores: docs.aws.amazon.com/boto3/latest/guide/configuration.html
+      - key: AWS_REQUEST_CHECKSUM_CALCULATION
+        value: when_required
+      - key: AWS_RESPONSE_CHECKSUM_VALIDATION
+        value: when_required
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS

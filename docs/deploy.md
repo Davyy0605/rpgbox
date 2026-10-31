@@ -88,6 +88,7 @@ Se você escolher B ou C, avise para registrarmos aqui.
 
    `SECRET_KEY` é gerada sozinha pelo Render. **Não** crie a variável `DEBUG` (sem ela o site roda em modo de produção).
 5. Confirme. O primeiro build leva alguns minutos e já roda as migrações.
+   Se o build falhar dizendo que a versão do Python não existe ou não é aceita, abra o serviço no Render, vá em **Environment** e troque `PYTHON_VERSION` por uma versão completa mais antiga (por exemplo `3.13.5`, o formato exige os três números). O código foi testado só no 3.14.3; em outra versão, rode os testes (`pytest --ignore=tests/e2e`) antes de confiar.
 6. Quando ficar "Live", abra `https://SEU-SITE.onrender.com/health`: deve mostrar `ok`.
 7. Volte ao passo 2.1 e coloque o endereço real em `AllowedOrigins`, se ainda não colocou.
 
@@ -101,6 +102,15 @@ python manage.py createsuperuser
 
 Se o Shell não existir no plano gratuito, rode do seu computador com o `DATABASE_URL` do Neon:
 
+No Windows (PowerShell):
+
+```
+$env:DATABASE_URL="cole-a-string-do-neon"; $env:SECRET_KEY="qualquer"; $env:DEBUG="true"
+python manage.py createsuperuser
+```
+
+No Mac ou Linux:
+
 ```
 DATABASE_URL="cole-a-string-do-neon" SECRET_KEY=qualquer DEBUG=true python manage.py createsuperuser
 ```
@@ -109,7 +119,7 @@ O administrador fica em `/admin/`.
 
 ## 5. Conferir o R2 de verdade
 
-Antes de confiar nos arquivos, teste o bucket real (uma vez). Com as quatro variáveis do R2 definidas no seu computador:
+Antes de confiar nos arquivos, teste o bucket real (uma vez). Defina no seu computador as quatro variáveis do R2 (`R2_BUCKET`, `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) e as três de apoio (`SECRET_KEY` com qualquer texto e `DEBUG=true`). No PowerShell, cada uma assim: `$env:R2_BUCKET="rpgbox-arquivos"`. Depois:
 
 ```
 python manage.py shell
@@ -124,7 +134,7 @@ b'ola'
 False
 ```
 
-Se der erro como `XAmzContentSHA256Mismatch`, `NotImplemented` ou sobre checksum: versões novas do `boto3` enviam um checksum extra que o R2 pode recusar. A correção é definir no Render `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` e `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` e testar de novo. Se funcionou sem erro, não é preciso fazer nada.
+O `render.yaml` já define `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` e `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` (nomes e valores conferidos na documentação do boto3, https://docs.aws.amazon.com/boto3/latest/guide/configuration.html). Eles evitam que versões novas do `boto3` enviem checksums extras que o R2 pode recusar. A documentação da Cloudflare que li não fala disso, então este teste é a prova. Para reproduzir no seu computador, defina também as duas variáveis (`$env:AWS_REQUEST_CHECKSUM_CALCULATION="when_required"` no PowerShell). Se ainda assim aparecer erro de checksum ou `NotImplemented`, me envie a mensagem.
 
 Também confira o CORS: no site, abra um PDF enviado. Ele deve abrir e permitir rolar as páginas. Se ficar em branco, o CORS do passo 2.1 está errado (ou o endereço em `AllowedOrigins` não é igual ao do site).
 

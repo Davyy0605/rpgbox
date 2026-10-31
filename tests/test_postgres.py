@@ -11,7 +11,7 @@ from indexing.services import reindex_record
 from records.models import Block, Tab
 from records.save import first_text_block, save_block
 
-from .helpers import doc, doc_headings
+from .helpers import doc, doc_headings, doc_mention
 from .test_indexing import make_record
 
 pytestmark = [
@@ -88,3 +88,25 @@ def test_concurrent_reindex_does_not_duplicate(record):
     for _ in range(20):
         parallel(lambda _: reindex_record(record), range(6))
         assert entries(record) == [("record", "")]
+
+
+def test_records_mentioning_each_other_reindex_without_deadlock(user, make_campaign):
+    campaign = make_campaign(user)
+    a = make_record(campaign, "Personagens", "Ana", body="x")
+    b = make_record(campaign, "Personagens", "Beto", body="x")
+    Block.objects.filter(tab__record=a).update(content=doc_mention(b.id, "Beto"))
+    Block.objects.filter(tab__record=b).update(content=doc_mention(a.id, "Ana"))
+    for _ in range(30):
+        parallel(lambda r: reindex_record(r), [a, b] * 3)
+    assert a.links_out.count() == 1 and b.links_out.count() == 1
+
+
+def test_saves_of_records_mentioning_each_other_do_not_deadlock(user, make_campaign):
+    campaign = make_campaign(user)
+    a = make_record(campaign, "Personagens", "Ana", body="x")
+    b = make_record(campaign, "Personagens", "Beto", body="x")
+    ba, bb = (Block.objects.get(tab__record=r) for r in (a, b))
+    for n in range(30):
+        content = (doc_mention(b.id, "Beto"), doc_mention(a.id, "Ana"))
+        parallel(lambda i: save_block(Block.objects.get(pk=(ba, bb)[i].pk), content[i], n + 1), [0, 1])
+    assert a.links_out.count() == 1 and b.links_out.count() == 1
