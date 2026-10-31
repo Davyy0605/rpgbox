@@ -1,5 +1,6 @@
 """Exportação de um documento para Markdown (sem escapar caracteres especiais)."""
 from .doc import safe_href
+from .render import editor_doc
 
 
 def _inline(node):
@@ -40,6 +41,8 @@ def _block(node):
     return _inline(node)
 
 
-def doc_to_markdown(doc) -> str:
+def doc_to_markdown(doc, resolve=None) -> str:
+    if resolve:  # nomes atuais nas menções
+        doc, _ = editor_doc(doc, resolve)
     blocks = [_block(n) for n in doc.get("content") or []]
     return "\n\n".join(blocks) + "\n" if blocks else ""

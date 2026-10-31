@@ -9,6 +9,8 @@ from assets.models import Asset
 from content.markdown import doc_to_markdown
 from records.models import Block, Record, Tab
 from records.sections import section
+from records.services import visible_fields
+from indexing.services import resolver_for
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +54,9 @@ class _Names:
         return name
 
 
-def _block_text(block):
+def _block_text(block, resolve):
     if block.kind == "text":
-        return doc_to_markdown(block.content).strip() if isinstance(block.content, dict) else ""
+        return doc_to_markdown(block.content, resolve).strip() if isinstance(block.content, dict) else ""
     target = block.embed_record
     if target is None:
         return f"> ~~{block.embed_label}~~ (registro removido)"
@@ -64,7 +66,7 @@ def _block_text(block):
             continue
         content = section(b.content, block.embed_anchor) if block.embed_anchor else b.content
         if content is not None:
-            parts.append(doc_to_markdown(content).strip())
+            parts.append(doc_to_markdown(content, resolve).strip())
             if block.embed_anchor:
                 break
     body = "\n\n".join(p for p in parts if p)
@@ -72,27 +74,30 @@ def _block_text(block):
     return f"> **{target.name}**\n{quoted}" if quoted else f"> **{target.name}**"
 
 
-def _tab_markdown(tab, level, blocks_by_tab, children):
+def _tab_markdown(tab, level, blocks_by_tab, children, resolve):
     out = [f"{'#' * level} {tab.title}"]
     for block in blocks_by_tab.get(tab.id, []):
-        text = _block_text(block)
+        text = _block_text(block, resolve)
         if text:
             out.append(text)
     for sub in children.get(tab.id, []):
-        out.append(_tab_markdown(sub, level + 1, blocks_by_tab, children))
+        out.append(_tab_markdown(sub, level + 1, blocks_by_tab, children, resolve))
     return "\n\n".join(out)
 
 
-def _record_markdown(record):
+def _record_markdown(record, resolve):
     lines = [f"# {record.name}"]
-    fields = [f for f in record.record_type.fielddef_set.filter(removed=False).order_by("position", "id")]
-    rows = []
-    for f in fields:
-        value = (record.fields or {}).get(f.key)
-        if value not in (None, ""):
+    rows, longs = [], []
+    for f, value in visible_fields(record):
+        if isinstance(value, dict):
+            text = doc_to_markdown(value, resolve).strip()
+            if text:
+                longs.append(f"**{f.label}**\n\n{text}")
+        elif value not in (None, ""):
             rows.append(f"- **{f.label}:** {str(value).replace(chr(10), ' ')}")
     if rows:
         lines.append("\n".join(rows))
+    lines.extend(longs)
     tabs = list(Tab.objects.filter(record=record).order_by("position", "id"))
     blocks_by_tab = {}
     for b in Block.objects.filter(tab__record=record).select_related("embed_record").order_by("position", "id"):
@@ -103,13 +108,14 @@ def _record_markdown(record):
             children.setdefault(t.parent_id, []).append(t)
     for t in tabs:
         if not t.parent_id:
-            lines.append(_tab_markdown(t, 2, blocks_by_tab, children))
+            lines.append(_tab_markdown(t, 2, blocks_by_tab, children, resolve))
     return "\n\n".join(lines) + "\n"
 
 
 def write_export(campaign, fileobj) -> None:
     records = (Record.objects.filter(campaign=campaign)
                .select_related("record_type").order_by("record_type__position", "record_type_id", "id"))
+    resolve = resolver_for(campaign)
     type_names = _Names()
     type_dirs = {}
     errors = []
@@ -121,7 +127,7 @@ def write_export(campaign, fileobj) -> None:
                 type_dirs[tid] = type_names.get(record.record_type.name, "Sem tipo")
                 record_names[tid] = _Names()
             folder = f"{type_dirs[tid]}/{record_names[tid].get(record.name)}"
-            zf.writestr(f"{folder}/registro.md", _record_markdown(record))
+            zf.writestr(f"{folder}/registro.md", _record_markdown(record, resolve))
             file_names = _Names()
             for asset in Asset.objects.filter(record=record).order_by("created_at", "id"):
                 target = f"{folder}/arquivos/{file_names.get_file(asset.filename)}"

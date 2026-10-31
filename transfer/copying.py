@@ -7,9 +7,15 @@ from django.db import transaction
 
 from assets.models import Asset
 from campaigns.models import FieldDef, RecordType, TabDef
-from indexing.services import reindex_record
+from content.render import editor_doc
+from indexing.services import reindex_record, resolver_for
 from records.models import Block, Record, Tab
 from records.sections import section
+
+
+def _plain(doc, resolve):
+    """Documento sem menções, com os nomes atuais dos destinos."""
+    return strip_mentions(editor_doc(doc, resolve)[0])
 
 
 def strip_mentions(node):
@@ -32,7 +38,7 @@ def _para(text):
     return {"type": "paragraph", "content": [{"type": "text", "text": text}] if text else []}
 
 
-def _frozen_embed(block):
+def _frozen_embed(block, resolve):
     """Conteúdo atual do bloco incorporado, como documento editável."""
     target = block.embed_record
     nodes = []
@@ -45,7 +51,7 @@ def _frozen_embed(block):
                 nodes.extend(content.get("content") or [])
                 if block.embed_anchor:
                     break
-    nodes = strip_mentions(nodes)
+    nodes = _plain({"type": "doc", "content": nodes}, resolve)["content"]
     if not nodes:
         nodes = [_para(block.embed_label)] if block.embed_label else []
     return {"type": "doc", "content": nodes}
@@ -111,6 +117,7 @@ def _copy_asset(asset, owner_id, new_record, tab, saved):
 def copy_record(record, dest) -> Record:
     """Copia o registro para outra campanha do mesmo mestre, de forma independente."""
     saved = []
+    resolve = resolver_for(record.campaign)
     try:
         with transaction.atomic():
             source_type = record.record_type
@@ -119,7 +126,7 @@ def copy_record(record, dest) -> Record:
             fields = {}
             for key, value in (record.fields or {}).items():
                 if key in fmap:
-                    fields[fmap[key]] = strip_mentions(value) if isinstance(value, dict) else value
+                    fields[fmap[key]] = _plain(value, resolve) if isinstance(value, dict) else value
             new = Record.objects.create(campaign=dest, record_type=dest_type, name=record.name, fields=fields)
 
             dest_defs = list(dest_type.tabdef_set.select_related("parent"))
@@ -132,7 +139,7 @@ def copy_record(record, dest) -> Record:
                     title=t.title, position=t.position)
 
             for b in Block.objects.filter(tab__record=record).select_related("embed_record").order_by("tab_id", "position", "id"):
-                content = _frozen_embed(b) if b.kind == "embed" else strip_mentions(b.content)
+                content = _frozen_embed(b, resolve) if b.kind == "embed" else _plain(b.content, resolve)
                 Block.objects.create(tab=tab_map[b.tab_id], kind="text", position=b.position, content=content)
 
             main = None
