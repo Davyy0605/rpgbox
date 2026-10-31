@@ -6,6 +6,7 @@
   <h1>{{ campaign.name }}</h1>
   <a class="plus" href="{% url 'type-new' campaign.id %}" aria-label="Novo tipo">+</a>
 </div>
+<p><a href="{% url 'campaign-export' campaign.id %}">Exportar campanha</a></p>
 <form class="form" role="search" action="{% url 'search' campaign.id %}">
   <input type="search" name="q" placeholder="Buscar" aria-label="Buscar" autocomplete="off" hx-get="{% url 'search' campaign.id %}" hx-trigger="input changed delay:200ms, search" hx-target="#results" hx-swap="outerHTML">
 </form>
