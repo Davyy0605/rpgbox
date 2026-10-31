@@ -58,6 +58,10 @@ TEMPLATES = [
     },
 ]
 
+for _var in ("DATABASE_URL", "R2_BUCKET"):  # fora de DEBUG, SQLite e disco local sumiriam no reinício
+    if not DEBUG and not os.environ.get(_var):
+        raise RuntimeError(f"{_var} é obrigatória fora de DEBUG.")
+
 DATABASES = {"default": dj_database_url.config(default="sqlite:///db.sqlite3", conn_max_age=60)}
 
 AUTH_USER_MODEL = "accounts.User"
