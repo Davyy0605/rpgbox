@@ -187,3 +187,56 @@ def test_markdown_lists_marks_mentions():
             {"type": "mention", "attrs": {"record": 1, "anchor": "", "label": "Kael"}}]}]}
     assert doc_to_markdown(d) == "- a\n- b\n\n1. c\n\n**n***i*[l](https://a.com)Kael\n"
     assert doc_to_markdown({"type": "doc"}) == ""
+
+
+def _colored(color, text="fogo", extra=None):
+    return {"type": "doc", "content": [{"type": "paragraph", "content": [
+        _text(text, [{"type": "textStyle", "attrs": {"color": color, **(extra or {})}}])]}]}
+
+
+def _marks(d):
+    return d["content"][0]["content"][0].get("marks")
+
+
+def test_color_mark_is_accepted_and_normalized_to_lowercase():
+    assert _marks(validate_doc(_colored("#FF8800"))) == [{"type": "textStyle", "attrs": {"color": "#ff8800"}}]
+
+
+def test_color_mark_drops_extra_attrs():
+    out = validate_doc(_colored("#ff8800", extra={"fontSize": "99px", "x": 1}))
+    assert _marks(out) == [{"type": "textStyle", "attrs": {"color": "#ff8800"}}]
+
+
+@pytest.mark.parametrize("bad", ["red", "url(x)", "#fff", "#ff88001", "#ff8800;x:y", "rgb(1,2,3)", " #ff8800",
+                                 "#ff8800\n", "#gg0000", 5, None, ["#ff8800"], {"a": 1}])
+def test_hostile_color_is_dropped_but_text_stays(bad):
+    out = validate_doc(_colored(bad))
+    assert out["content"][0]["content"][0]["text"] == "fogo"
+    assert not _marks(out)
+
+
+def test_color_mark_without_attrs_keeps_text():
+    d = {"type": "doc", "content": [{"type": "paragraph", "content": [_text("a", [{"type": "textStyle"}])]}]}
+    assert plain_text(validate_doc(d)) == "a"
+
+
+def test_render_color_with_other_marks():
+    marks = [{"type": "bold"}, {"type": "textStyle", "attrs": {"color": "#ff8800"}},
+             {"type": "link", "attrs": {"href": "https://a.com"}}]
+    d = {"type": "doc", "content": [{"type": "paragraph", "content": [_text("x", marks)]}]}
+    out = render_doc(d, lambda ids: {})
+    assert '<span style="color:#ff8800">' in out and "<strong>" in out and "<a " in out
+
+
+@pytest.mark.parametrize("bad", ["red", "#ff8800;x:y", '#ff8800"><script>', "url(x)", 3, None])
+def test_render_ignores_invalid_color_in_stored_doc(bad):
+    out = render_doc(_colored(bad), lambda ids: {})
+    assert "style" not in out and "fogo" in out
+
+
+def test_color_does_not_leak_into_markdown_search_text_or_editor_doc():
+    from content.render import editor_doc
+    d = _colored("#ff8800")
+    assert doc_to_markdown(d) == "fogo\n"
+    assert plain_text(d) == "fogo"
+    assert editor_doc(d, lambda ids: {})[0] == d

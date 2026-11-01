@@ -7,10 +7,11 @@ from django.core.exceptions import ValidationError
 
 NODES = {"doc", "paragraph", "heading", "text", "bulletList", "orderedList",
          "listItem", "hardBreak", "mention"}
-MARKS = {"bold", "italic", "link"}
+MARKS = {"bold", "italic", "link", "textStyle"}
 SAFE_SCHEMES = {"http", "https", "mailto"}
 MAX_DEPTH = 32
 ANCHOR_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+COLOR_RE = re.compile(r"#[0-9A-Fa-f]{6}")
 SEP = " › "
 _BAD_URL_CHARS = re.compile(r"[\x00-\x20\x7f-\x9f  ]")
 
@@ -27,6 +28,10 @@ def safe_href(href) -> bool:
     if scheme not in SAFE_SCHEMES:
         return False
     return bool(parts.path) if scheme == "mailto" else bool(parts.netloc)
+
+
+def valid_color(color) -> bool:
+    return isinstance(color, str) and COLOR_RE.fullmatch(color) is not None
 
 
 def valid_anchor(anchor) -> bool:
@@ -60,6 +65,11 @@ def _mark(mark):
         if not safe_href(href) or not clean_text(href):
             _fail("Endereço de link não permitido.")
         return {"type": "link", "attrs": {"href": href}}
+    if mark["type"] == "textStyle":
+        # Cor inválida descarta só a marca: o texto fica, sem erro para quem escreveu.
+        attrs = mark.get("attrs")
+        color = attrs.get("color") if isinstance(attrs, dict) else None
+        return {"type": "textStyle", "attrs": {"color": color.lower()}} if valid_color(color) else None
     return {"type": mark["type"]}
 
 
@@ -82,7 +92,9 @@ def _node(node, depth):
         if node.get("marks"):
             if not isinstance(node["marks"], list):
                 _fail("Marcas inválidas.")
-            out["marks"] = [_mark(m) for m in node["marks"]]
+            marks = [m for m in map(_mark, node["marks"]) if m]
+            if marks:
+                out["marks"] = marks
         return out
     if kind == "heading":
         level = attrs.get("level", 2)

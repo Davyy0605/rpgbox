@@ -181,3 +181,4 @@ body.editing .page { padding-bottom: 88px; }
 #modelo, #grupos, #abas, #arquivos { overflow-anchor: none; }
 /* No toque, segurar o dedo é o menu do site, não a seleção de texto nem o menu do link no iOS */
 @media (pointer: coarse) { [data-delete-url] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
+.toolbar input[type=color] { flex: 0 1 52px; min-width: 44px; min-height: 44px; padding: 6px; background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
