@@ -458,3 +458,73 @@ def test_picker_enter_waits_for_the_answer(page, live_server, logged_in, charact
 def test_no_horizontal_scroll_with_editor(page, live_server, logged_in, character):
     page.goto(url_of(character)); page.locator(TEXT).click()
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
+
+
+def color_input(page):
+    return page.get_by_label("Cor", exact=True)
+
+
+def pick(page, color):
+    # Como o dedo: o toque no seletor vem antes de o editor perder o foco.
+    color_input(page).dispatch_event("pointerdown")
+    color_input(page).fill(color)
+
+
+def select_all(page):
+    page.locator(TEXT).click()
+    page.keyboard.press("Control+A")
+
+
+def test_color_applies_to_selection_and_survives_reload(page, live_server, logged_in, character):
+    page.goto(url_of(character))
+    select_all(page)
+    saved(page, lambda: pick(page, "#FF8800"), "textStyle")
+    marks = next(n for n in iter_nodes(block_of(character).content) if n["type"] == "text")["marks"]
+    assert marks == [{"type": "textStyle", "attrs": {"color": "#ff8800"}}]
+    page.reload()
+    expect(page.locator(TEXT).locator("span")).to_have_css("color", "rgb(255, 136, 0)")
+    expect(page.locator(".unreadable")).to_have_count(0)
+    page.locator(TEXT).click()
+    page.keyboard.press("Control+End"); page.keyboard.type("!")
+    expect(page.locator(TEXT)).to_have_text("texto!")
+
+
+def test_color_keeps_selection_when_the_editor_loses_focus(page, live_server, logged_in, character):
+    page.goto(url_of(character))
+    select_all(page)
+    # Como no celular: tocar no seletor tira o foco do editor.
+    page.get_by_label("Cor", exact=True).dispatch_event("pointerdown")
+    page.evaluate("() => document.activeElement.blur()")
+    expect(page.get_by_role("toolbar")).to_be_visible()
+    saved(page, lambda: pick(page, "#00ff00"), "#00ff00")
+    expect(page.locator(TEXT).locator("span")).to_have_css("color", "rgb(0, 255, 0)")
+
+
+def test_color_without_selection_does_not_paint_existing_text(page, live_server, logged_in, character):
+    page.goto(url_of(character))
+    page.locator(TEXT).click()
+    page.keyboard.press("Control+End")
+    pick(page, "#ff0000")
+    expect(page.locator(TEXT).locator("span")).to_have_count(0)
+    assert block_of(character).content["content"][0]["content"][0].get("marks") is None
+
+
+def test_remove_color_returns_text_to_default(page, live_server, logged_in, character):
+    page.goto(url_of(character))
+    select_all(page)
+    saved(page, lambda: pick(page, "#ff8800"), "textStyle")
+    remove = page.get_by_role("button", name="Remover cor")
+    expect(remove).to_have_attribute("aria-pressed", "true")
+    saved(page, remove.click, lambda body: "textStyle" not in body)
+    expect(remove).to_have_attribute("aria-pressed", "false")
+    expect(page.locator(TEXT).locator("span")).to_have_count(0)
+    assert "marks" not in next(n for n in iter_nodes(block_of(character).content) if n["type"] == "text")
+
+
+def test_document_saved_with_color_opens_editable_in_a_field(page, live_server, logged_in, character):
+    from ..test_content import _colored
+    set_body(character, _colored("#ff8800"))
+    page.goto(url_of(character))
+    expect(page.locator(".unreadable")).to_have_count(0)
+    expect(page.locator(TEXT).locator("span")).to_have_css("color", "rgb(255, 136, 0)")
+    expect(page.locator(TEXT)).to_have_attribute("contenteditable", "true")

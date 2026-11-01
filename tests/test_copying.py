@@ -191,3 +191,10 @@ def test_copy_failure_leaves_nothing_and_removes_files(record_with_image, other_
     assert not Tab.objects.filter(record__campaign=other_campaign_same_owner).exists()
     assert Asset.objects.count() == 2
     assert RecordType.objects.filter(campaign=other_campaign_same_owner).count() == types_before
+
+
+def test_copy_keeps_text_with_color(character, other_campaign_same_owner):
+    from .test_content import _colored
+    set_body(character, _colored("#ff8800"))
+    c = copy_record(character, other_campaign_same_owner)
+    assert "fogo" in all_text(c)
