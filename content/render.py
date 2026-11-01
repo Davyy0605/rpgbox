@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.html import escape, format_html
 from django.utils.safestring import SafeString, mark_safe
 
-from .doc import MAX_DEPTH, SEP, is_int, iter_nodes, safe_href, valid_anchor
+from .doc import MAX_DEPTH, SEP, is_int, iter_nodes, safe_href, valid_anchor, valid_color
 
 _SIMPLE = {"paragraph": "p", "bulletList": "ul", "orderedList": "ol", "listItem": "li"}
 
@@ -25,6 +25,11 @@ def _text(node):
             out = format_html("<strong>{}</strong>", out)
         elif kind == "italic":
             out = format_html("<em>{}</em>", out)
+        elif kind == "textStyle":
+            attrs = mark.get("attrs")
+            color = attrs.get("color") if isinstance(attrs, dict) else None
+            if valid_color(color):
+                out = format_html('<span style="color:{}">{}</span>', color.lower(), out)
         elif kind == "link":
             href = (mark.get("attrs") or {}).get("href")
             if safe_href(href):

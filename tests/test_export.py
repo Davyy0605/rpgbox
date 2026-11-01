@@ -146,3 +146,13 @@ def test_export_tab_file_and_duplicate_filenames(campaign):
     files = sorted(n for n in z.namelist() if "/arquivos/" in n)
     assert files == ["Personagens/Kael/arquivos/mapa (2).txt", "Personagens/Kael/arquivos/mapa.txt"]
     assert {z.read(n) for n in files} == {b"1", b"2"}
+
+
+def test_export_embed_ignores_color(campaign):
+    from tests.test_content import _colored
+    a = make_record(campaign, "Locais", "Torre")
+    text_block(a, _colored("#ff8800"))
+    b = make_record(campaign, "Locais", "Mapa")
+    add_embed(first_tab(b), a, "")
+    md = export(campaign).read("Locais/Mapa/registro.md").decode()
+    assert "fogo" in md and "ff8800" not in md and "textStyle" not in md
