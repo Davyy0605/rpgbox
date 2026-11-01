@@ -84,8 +84,17 @@ async function remove(item) {
   }
   closeSheetOf(item);
   const next = neighbour(item);
+  countDown(item);
   item.remove();
   next?.focus({ preventScroll: true });
+}
+
+function countDown(item) {
+  const count = item.closest(".records") && document.querySelector("[data-count]");
+  if (!count) return;
+  const total = Number(count.dataset.count) - 1;
+  count.dataset.count = total;
+  count.textContent = `${total} registro${total === 1 ? "" : "s"}`;
 }
 
 function cancelPress() {

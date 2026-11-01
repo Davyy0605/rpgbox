@@ -1,15 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Campanhas · RPGBox{% endblock %}
 {% block content %}
+{% if campaigns %}
 <h1>Campanhas</h1>
-<ul class="list">
-  {% for c in campaigns %}<li data-delete-url="{% url 'campaign-delete' c.id %}"><a href="{% url 'campaign-home' c.id %}">{{ c.name }}</a></li>{% empty %}<li class="muted">Nenhuma campanha ainda.</li>{% endfor %}
+<p class="muted">Escolha uma para continuar.</p>
+<ul class="list records">
+  {% for c in campaigns %}<li data-delete-url="{% url 'campaign-delete' c.id %}"><a href="{% url 'campaign-home' c.id %}"><span class="row-img" data-i="{{ c.name|slice:":1"|upper }}" aria-hidden="true"></span>{{ c.name }}</a></li>{% endfor %}
 </ul>
-<p class="muted">Espaço usado: {{ storage_mb }} MB</p>
-<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn-link" type="submit">Sair</button></form>
+<p class="empty muted">Nenhuma campanha ainda.</p>
+{% else %}
+<div class="hero">
+  <h1>Boas-vindas ao RPGBox</h1>
+  <p class="muted">Guarde sua campanha em um só lugar e ache tudo rápido durante a sessão.</p>
+</div>
+<ol class="steps">
+  <li>Crie sua campanha</li>
+  <li>Adicione personagens, itens e regiões</li>
+  <li>Escreva e ligue tudo com @</li>
+</ol>
+{% endif %}
+<h2>{% if campaigns %}Nova campanha{% else %}Comece pela sua campanha{% endif %}</h2>
 <form method="post" class="form">
   {% csrf_token %}
   {{ form.as_div }}
   <button class="btn" type="submit">Criar campanha</button>
 </form>
+<p class="muted">Espaço usado: {{ storage_mb }} MB</p>
+<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn-link" type="submit">Sair</button></form>
 {% endblock %}

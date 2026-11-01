@@ -4,18 +4,17 @@
 {% block topsearch %}{% endblock %}
 {% block crumbs %}<a href="{% url 'campaign-list' %}">Campanhas</a>{% endblock %}
 {% block content %}
-<div class="head-row">
-  <h1>{{ campaign.name }}</h1>
-  <a class="plus" href="{% url 'type-new' campaign.id %}" aria-label="Novo tipo">+</a>
-</div>
-<p><a class="btn-link" href="{% url 'campaign-export' campaign.id %}">Exportar campanha</a></p>
+<h1>{{ campaign.name }}</h1>
+<p class="muted">Tudo o que existe nesta campanha.</p>
 <form class="form" role="search" action="{% url 'search' campaign.id %}">
-  <input type="search" name="q" placeholder="Buscar" aria-label="Buscar" autocomplete="off" data-search-input hx-sync="this:replace" hx-get="{% url 'search' campaign.id %}" hx-trigger="input changed delay:200ms, search" hx-target="#results" hx-swap="outerHTML">
+  <input type="search" name="q" placeholder="Buscar em toda a campanha" aria-label="Buscar" autocomplete="off" data-search-input hx-sync="this:replace" hx-get="{% url 'search' campaign.id %}" hx-trigger="input changed delay:200ms, search" hx-target="#results" hx-swap="outerHTML">
 </form>
 <ul class="list" id="results"></ul>
-<ul class="list">
+<ul class="list types">
   {% for t in types %}
-  <li class="type-row" data-delete-url="{% url 'type-delete' campaign.id t.id %}"><a class="type-link" href="{% url 'record-list' campaign.id t.id %}">{{ t.name }} <span class="muted">{{ t.total }}</span></a><a class="plus" href="{% url 'record-new' campaign.id t.id %}" aria-label="Novo em {{ t.name }}">+</a></li>
+  <li class="type-row" data-delete-url="{% url 'type-delete' campaign.id t.id %}"><a class="type-link" href="{% url 'record-list' campaign.id t.id %}"><span><strong>{{ t.name }}</strong><small class="muted">{% if t.total %}{{ t.total }} registro{{ t.total|pluralize }}{% else %}Ainda vazio{% endif %}</small></span></a><a class="plus type-new" href="{% url 'record-new' campaign.id t.id %}" aria-label="Novo em {{ t.name }}">+ Novo</a></li>
   {% endfor %}
 </ul>
+<p class="empty muted">Nenhum tipo ainda. Crie o primeiro para organizar sua campanha.</p>
+<p class="acts"><a class="btn-link" href="{% url 'type-new' campaign.id %}">+ Criar tipo</a> <a class="btn-link" href="{% url 'campaign-export' campaign.id %}">Exportar campanha</a></p>
 {% endblock %}
