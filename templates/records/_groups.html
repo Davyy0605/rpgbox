@@ -1,10 +1,10 @@
-<nav class="strip" aria-label="Sub-abas da lista">
+<nav class="strip" aria-label="Grupos da lista">
   <a href="?{% if gallery %}v=galeria{% endif %}" class="{% if not current_group %}on{% endif %}">Todas</a>
   {% for g in groups %}<a href="?g={{ g.id }}{% if gallery %}&amp;v=galeria{% endif %}" class="{% if g == current_group %}on{% endif %}" data-delete-url="{% url 'group-remove' g.id %}"{% if g == current_group %} data-delete-go="?{% if gallery %}v=galeria{% endif %}"{% endif %}{% if g.id == new_group %} autofocus{% endif %}>{{ g.name }}</a>{% endfor %}
-  <details class="add"><summary aria-label="Nova sub-aba">+</summary>
+  <details class="add"><summary>+ Novo grupo</summary>
     <form method="post" action="{% url 'group-add' campaign.id rtype.id %}" hx-post="{% url 'group-add' campaign.id rtype.id %}">{% csrf_token %}
       <input type="hidden" name="g" value="{{ current_group.id|default:'' }}">{% if gallery %}<input type="hidden" name="v" value="galeria">{% endif %}
-      <input name="name" placeholder="Nome" aria-label="Nome da sub-aba" required maxlength="80"><button class="btn" type="submit">Criar</button>
+      <input name="name" placeholder="Nome" aria-label="Nome do grupo" required maxlength="80"><button class="btn" type="submit">Criar</button>
     </form>
   </details>
 </nav>

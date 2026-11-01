@@ -2,6 +2,7 @@
 {% block title %}Cadastro - RPGBox{% endblock %}
 {% block content %}
 <h1>Criar conta</h1>
+<p class="muted">Sua campanha em um só lugar, pronta para a próxima sessão.</p>
 <form method="post" class="form">
   {% csrf_token %}
   {{ form.as_div }}

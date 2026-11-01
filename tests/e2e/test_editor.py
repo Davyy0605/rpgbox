@@ -312,7 +312,7 @@ def test_empty_tab_lets_you_write_right_away(page, live_server, logged_in, campa
     assert not Block.objects.filter(tab__record=empty).exists()
     page.goto(url_of(empty))
     assert not Block.objects.filter(tab__record=empty).exists()
-    expect(page.get_by_role("button", name="+ Texto")).to_have_count(0)
+    expect(page.get_by_role("button", name="+ Adicionar texto")).to_have_count(0)
     page.locator(TEXT).click()
     saved(page, lambda: page.keyboard.type("direto"), "direto")
     saved(page, lambda: page.keyboard.type("!"), "direto!")
@@ -324,7 +324,7 @@ def test_empty_tab_lets_you_write_right_away(page, live_server, logged_in, campa
 
 def test_embed_picker_adds_a_record(page, live_server, logged_in, character, elf):
     page.goto(url_of(character))
-    page.get_by_text("Incorporar").click()
+    page.get_by_text("Trazer de outra ficha").click()
     page.get_by_role("combobox", name="Origem").fill("elf")
     page.get_by_role("option", name="Elfos").click()
     expect(page.locator(".embed-block")).to_contain_text("base")
@@ -335,7 +335,7 @@ def test_embed_picker_adds_a_heading(page, live_server, logged_in, character, el
     set_body(elf, doc_headings([(2, "v", "Visão"), "enxerga", (2, "g", "Graça"), "dança"]))
     reindex_record(elf)
     page.goto(url_of(character))
-    page.get_by_text("Incorporar").click()
+    page.get_by_text("Trazer de outra ficha").click()
     page.get_by_role("combobox", name="Origem").fill("graça")
     page.get_by_role("option", name="Elfos › Graça").click()
     expect(page.locator(".embed-block")).to_contain_text("dança")
@@ -347,7 +347,7 @@ def test_embed_picker_adds_a_heading(page, live_server, logged_in, character, el
 def test_embed_picker_does_not_offer_the_record_itself(page, live_server, logged_in, character, elf):
     add_embed(character.tab_set.first(), elf, "")
     page.goto(url_of(character))
-    page.get_by_text("Incorporar").click()
+    page.get_by_text("Trazer de outra ficha").click()
     page.get_by_role("combobox", name="Origem").fill("kael")
     expect(page.get_by_text("Nada encontrado")).to_be_visible()
     expect(page.get_by_role("option")).to_have_count(0)
@@ -388,7 +388,7 @@ def test_picker_burst_sends_one_suggest_request(page, live_server, logged_in, ch
     make_record(campaign, "Raças", "Elfos Negros Antigos")
     urls = suggest_queries(page)
     page.goto(url_of(character))
-    page.get_by_text("Incorporar").click()
+    page.get_by_text("Trazer de outra ficha").click()
     page.get_by_role("combobox", name="Origem").press_sequentially(BURST, delay=15)
     expect(page.get_by_role("option", name="Elfos Negros Antigos")).to_be_visible()
     assert 1 <= len(urls) <= 2, urls
@@ -444,7 +444,7 @@ def test_picker_enter_waits_for_the_answer(page, live_server, logged_in, charact
     held = []
     page.route(SUGGEST, lambda route: held.append(route))
     page.goto(url_of(character))
-    page.get_by_text("Incorporar").click()
+    page.get_by_text("Trazer de outra ficha").click()
     box = page.get_by_role("combobox", name="Origem")
     box.press_sequentially("elf")
     expect(page.get_by_role("listbox")).to_contain_text("Buscando")

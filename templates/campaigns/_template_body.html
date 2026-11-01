@@ -59,19 +59,19 @@
   <input name="title" placeholder="Nova aba" maxlength="80" required aria-label="Nome da nova aba"><button class="btn" type="submit">Adicionar</button>
 </form>
 
-<h2>Sub-abas da lista</h2>
+<h2>Grupos da lista</h2>
 <ul class="edit-list">
   {% for g in groups %}
   <li>
     <form method="post" action="{% url 'group-rename' g.id %}" class="edit-row">{% csrf_token %}
-      <input name="name" value="{{ g.name }}" maxlength="80" required aria-label="Nome da sub-aba da lista"><button class="btn-link" type="submit">Salvar</button>
+      <input name="name" value="{{ g.name }}" maxlength="80" required aria-label="Nome do grupo"><button class="btn-link" type="submit">Salvar</button>
     </form>
     <div class="edit-actions">
       <form method="post" action="{% url 'group-remove' g.id %}">{% csrf_token %}<button class="btn-link" type="submit" aria-label="Remover {{ g.name }}">Remover</button></form>
     </div>
   </li>
-  {% empty %}<li class="muted">Nenhuma sub-aba na lista.</li>{% endfor %}
+  {% empty %}<li class="muted">Nenhum grupo na lista.</li>{% endfor %}
 </ul>
 <form method="post" action="{% url 'group-add' campaign.id rtype.id %}" class="edit-row">{% csrf_token %}
-  <input name="name" placeholder="Nova sub-aba da lista" maxlength="80" required aria-label="Nome da nova sub-aba da lista"><button class="btn" type="submit">Adicionar</button>
+  <input name="name" placeholder="Novo grupo" maxlength="80" required aria-label="Nome do novo grupo"><button class="btn" type="submit">Adicionar</button>
 </form>

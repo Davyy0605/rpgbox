@@ -1,6 +1,6 @@
 <nav class="strip" aria-label="Abas">
   {% for t in tabs %}<a href="?aba={{ t.id }}" class="{% if t == parent %}on{% endif %}" data-delete-url="{% url 'tab-delete' t.id %}"{% if t == parent %} data-delete-go="{% url 'record-detail' record.id %}"{% endif %}{% if t.id == new_tab %} autofocus{% endif %}>{{ t.title }}</a>{% endfor %}
-  <details class="add"><summary aria-label="Nova aba">+</summary>
+  <details class="add"><summary>+ Nova aba</summary>
     <form method="post" action="{% url 'tab-add' record.id %}" hx-post="{% url 'tab-add' record.id %}">{% csrf_token %}
       <input type="hidden" name="aba" value="{% if gallery %}galeria{% else %}{{ selected.id }}{% endif %}">
       <input name="title" placeholder="Nome" aria-label="Nome da aba" required maxlength="80"><button class="btn" type="submit">Criar</button>
@@ -11,7 +11,7 @@
 {% if parent %}
 <nav class="strip sub" aria-label="Sub-abas">
   {% for c in parent.children %}<a href="?aba={{ c.id }}" class="{% if c == selected %}on{% endif %}" data-delete-url="{% url 'tab-delete' c.id %}"{% if c == selected %} data-delete-go="{% url 'record-detail' record.id %}"{% endif %}{% if c.id == new_tab %} autofocus{% endif %}>{{ c.title }}</a>{% endfor %}
-  <details class="add"><summary aria-label="Nova sub-aba">+</summary>
+  <details class="add"><summary>+ Nova sub-aba</summary>
     <form method="post" action="{% url 'subtab-add' record.id parent.id %}" hx-post="{% url 'subtab-add' record.id parent.id %}">{% csrf_token %}
       <input type="hidden" name="aba" value="{{ selected.id }}">
       <input name="title" placeholder="Nome" aria-label="Nome da sub-aba" required maxlength="80"><button class="btn" type="submit">Criar</button>

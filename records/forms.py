@@ -3,7 +3,7 @@ from django import forms
 
 class RecordForm(forms.Form):
     name = forms.CharField(label="Nome", max_length=160)
-    group = forms.ModelChoiceField(label="Sub-aba da lista", queryset=None, required=False, empty_label="Nenhuma")
+    group = forms.ModelChoiceField(label="Grupo", queryset=None, required=False, empty_label="Nenhum")
 
     def __init__(self, record_type, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -11,7 +11,7 @@ class RecordForm(forms.Form):
 
 
 class GroupChoiceForm(forms.Form):
-    group = forms.ModelChoiceField(label="Sub-aba da lista", queryset=None, required=False, empty_label="Nenhuma")
+    group = forms.ModelChoiceField(label="Grupo", queryset=None, required=False, empty_label="Nenhum")
 
     def __init__(self, record_type, *args, **kwargs):
         super().__init__(*args, **kwargs)

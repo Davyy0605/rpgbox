@@ -317,7 +317,7 @@ def test_personalizar_add_rename_remove_keep_the_scroll(page, live_server, logge
     url = template_url(long_template)
     page.goto(url)
     page.evaluate("window.sameDocument = true")
-    add = page.get_by_placeholder("Nova sub-aba da lista")
+    add = page.get_by_placeholder("Novo grupo")
     add.scroll_into_view_if_needed()
     before = page.evaluate("window.scrollY")
     add.fill("Taverna")
@@ -390,7 +390,7 @@ def create_in_strip(page, nav, name):
 def test_new_filter_appears_without_reloading(page, live_server, logged_in, character):
     page.goto(list_url(character))
     page.evaluate("window.sameDocument = true")
-    create_in_strip(page, "Sub-abas da lista", "Taverna")
+    create_in_strip(page, "Grupos da lista", "Taverna")
     expect(page.get_by_role("link", name="Taverna")).to_be_focused()
     assert page.evaluate("window.sameDocument") is True
     expect(page).to_have_url(list_url(character))
@@ -415,7 +415,7 @@ def test_new_subtab_and_block_appear_without_reloading(page, live_server, logged
     page.evaluate("window.sameDocument = true")
     create_in_strip(page, "Sub-abas", "Filha")
     expect(page.get_by_role("link", name="Filha")).to_be_visible()
-    page.get_by_role("button", name="+ Texto").click()
+    page.get_by_role("button", name="+ Adicionar texto").click()
     new = page.locator("[data-editor=text] [contenteditable]").nth(1)
     new.click()
     page.keyboard.type("bloco novo")

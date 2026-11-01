@@ -299,7 +299,7 @@ def test_every_tabdef_action_answers_the_fragment(signed_in, kael, action):
 def test_group_add_from_personalizar_answers_personalizar(signed_in, campaign, kael):
     url = f"/c/{campaign.id}/t/{kael.record_type_id}/grupos/novo/"
     r = signed_in.post(url, {"name": "Taverna"}, HTTP_HX_TARGET="modelo", **HTMX)
-    assert r.status_code == 200 and "<h2>Sub-abas da lista</h2>" in r.content.decode()
+    assert r.status_code == 200 and "<h2>Grupos da lista</h2>" in r.content.decode()
 
 
 def test_group_rename_and_remove_answer_personalizar(signed_in, kael):
