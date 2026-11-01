@@ -2,6 +2,7 @@ import { Editor } from "@tiptap/core";
 import Link from "@tiptap/extension-link";
 import { Placeholder } from "@tiptap/extensions";
 import StarterKit from "@tiptap/starter-kit";
+import { Color, TextStyle } from "@tiptap/extension-text-style";
 
 import { AnchoredHeading } from "./heading.js";
 import { mentionExtension } from "./mention.js";
@@ -93,6 +94,8 @@ export function initEditor(element) {
         HTMLAttributes: { target: "_blank", rel: "noopener noreferrer nofollow", class: null },
         isAllowedUri: safeHref,
       }),
+      TextStyle,
+      Color,
       mentionExtension({ suggestUrl: element.dataset.suggestUrl, missing: readMissing(element) }),
       Placeholder.configure({ placeholder: "Escreva aqui. Use @ para citar." }),
     ],
