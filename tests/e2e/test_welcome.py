@@ -2,8 +2,10 @@ import os
 
 from playwright.sync_api import expect
 
+from campaigns.models import ListGroup
+
 from ..test_indexing import make_record
-from .test_deleting import delete_by_menu, list_url
+from .test_deleting import delete_by_menu, desktop, list_url  # noqa: F401
 
 
 def shot(page, name):
@@ -59,7 +61,7 @@ def test_campaign_home_names_its_buttons(page, live_server, logged_in, campaign,
     row = page.locator(".type-row", has_text=character.record_type.name)
     expect(row.get_by_text("1 registro", exact=True)).to_be_visible()
     expect(row.get_by_role("link", name=f"Novo em {character.record_type.name}")).to_have_text("+ Novo")
-    expect(page.get_by_role("link", name="+ Criar outro tipo")).to_be_visible()
+    expect(page.get_by_role("link", name="+ Criar tipo")).to_be_visible()
     expect(page.get_by_text("Ainda vazio").first).to_be_visible()
     shot(page, "5-campanha")
 
@@ -68,3 +70,13 @@ def test_record_tabs_have_named_buttons(page, live_server, logged_in, character)
     page.goto(f"/r/{character.id}/")
     expect(page.locator("#abas summary").first).to_have_text("+ Nova aba")
     shot(page, "6-ficha")
+
+
+def test_group_keeps_count_and_explains_when_empty(page, live_server, logged_in, desktop, campaign, character):
+    group = ListGroup.objects.create(record_type=character.record_type, name="Vilões")
+    page.goto(f"{list_url(character)}?g={group.id}")
+    expect(page.get_by_role("heading", name="Nada neste grupo ainda")).to_be_visible()
+    page.goto(list_url(character))
+    delete_by_menu(page, page.get_by_role("navigation", name="Grupos da lista").get_by_role("link", name="Vilões"))
+    expect(page.get_by_role("navigation", name="Grupos da lista").get_by_role("link", name="Vilões")).to_have_count(0)
+    expect(page.get_by_text("1 registro", exact=True)).to_be_visible()

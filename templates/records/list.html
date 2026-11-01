@@ -26,8 +26,8 @@
 </ul>
 {% endif %}
 <div class="empty">
-  <h2>Nada por aqui ainda</h2>
-  <p class="muted">Crie o primeiro registro. Depois, cite-o em qualquer texto digitando @.</p>
+  <h2>{% if current_group %}Nada neste grupo ainda{% else %}Nada por aqui ainda{% endif %}</h2>
+  <p class="muted">{% if current_group %}Crie um registro aqui ou escolha outro grupo.{% else %}Crie o primeiro registro. Depois, cite-o em qualquer texto digitando @.{% endif %}</p>
 </div>
 <p class="muted" data-filter-empty hidden>Nada encontrado.</p>
 <p class="muted tip">Dica: para apagar, segure o nome no celular ou clique com o botão direito no computador.</p>

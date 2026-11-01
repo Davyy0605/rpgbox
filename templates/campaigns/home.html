@@ -16,5 +16,5 @@
   {% endfor %}
 </ul>
 <p class="empty muted">Nenhum tipo ainda. Crie o primeiro para organizar sua campanha.</p>
-<p class="acts"><a class="btn-link" href="{% url 'type-new' campaign.id %}">+ Criar outro tipo</a> <a class="btn-link" href="{% url 'campaign-export' campaign.id %}">Exportar campanha</a></p>
+<p class="acts"><a class="btn-link" href="{% url 'type-new' campaign.id %}">+ Criar tipo</a> <a class="btn-link" href="{% url 'campaign-export' campaign.id %}">Exportar campanha</a></p>
 {% endblock %}
